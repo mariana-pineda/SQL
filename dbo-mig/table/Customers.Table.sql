@@ -1,6 +1,6 @@
 
 CREATE TABLE Customers (
-	CustomerID STRING NOT NULL, 
+	CustomerID CHAR(5) NOT NULL, 
 	CompanyName STRING NOT NULL, 
 	ContactName STRING NULL, 
 	ContactTitle STRING NULL, 
@@ -10,8 +10,6 @@ CREATE TABLE Customers (
 	PostalCode STRING NULL, 
 	Country STRING NULL, 
 	Phone STRING NULL, 
-	Fax STRING NULL
-) USING DELTA;
-
-ALTER TABLE Customers
-ADD CONSTRAINT PK_Customers PRIMARY KEY (CustomerID);
+	Fax STRING NULL, 
+	PRIMARY KEY (CustomerID)
+)
