@@ -1,6 +1,9 @@
 
 CREATE TABLE Region (
   RegionID INT NOT NULL, 
-  RegionDescription STRING NOT NULL, 
-  PRIMARY KEY (RegionID)
-)
+  RegionDescription STRING NOT NULL
+);
+
+ALTER TABLE Region 
+ADD CONSTRAINT PK_Region 
+PRIMARY KEY (RegionID);
