@@ -1,7 +1,9 @@
+
 CREATE TABLE Cateries (
-    CateryID INT NOT NULL GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    CateryName STRING(15) NOT NULL,
-    Description STRING, 
-    Picture BINARY,
+    CateryID INT NOT NULL GENERATED ALWAYS AS IDENTITY,
+    CateryName STRING NOT NULL,
+    Description STRING NULL,
+    Picture BINARY NULL,
     PRIMARY KEY (CateryID)
 )
+
