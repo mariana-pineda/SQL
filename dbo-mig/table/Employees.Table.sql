@@ -1,24 +1,25 @@
 
 CREATE TABLE Employees (
-    EmployeeID INT NOT NULL,
-    LastName STRING NOT NULL,
-    FirstName STRING NOT NULL,
-    Title STRING NULL,
-    TitleOfCourtesy STRING NULL,
-    BirthDate TIMESTAMP NULL,
-    HireDate TIMESTAMP NULL,
-    Address STRING NULL,
-    City STRING NULL,
-    Region STRING NULL,
-    PostalCode STRING NULL,
-    Country STRING NULL,
-    HomePhone STRING NULL,
-    Extension STRING NULL,
-    Photo BINARY NULL,
-    Notes STRING NULL,
-    ReportsTo INT NULL,
-    PhotoPath STRING NULL
+  EmployeeID INTEGER NOT NULL GENERATED ALWAYS AS IDENTITY, 
+  LastName STRING NOT NULL, 
+  FirstName STRING NOT NULL, 
+  Title STRING, 
+  TitleOfCourtesy STRING, 
+  BirthDate TIMESTAMP, 
+  HireDate TIMESTAMP, 
+  Address STRING, 
+  City STRING, 
+  Region STRING, 
+  PostalCode STRING, 
+  Country STRING, 
+  HomePhone STRING, 
+  Extension STRING, 
+  Photo BINARY, 
+  Notes STRING, 
+  ReportsTo INTEGER, 
+  PhotoPath STRING,
+  PRIMARY KEY (EmployeeID)
 );
 
-ALTER TABLE Employees ADD CONSTRAINT PK_Employees PRIMARY KEY (EmployeeID);
-ALTER TABLE Employees ADD CONSTRAINT FK_Employees_Employees FOREIGN KEY (ReportsTo) REFERENCES Employees (EmployeeID);
+ALTER TABLE Employees
+ADD CONSTRAINT FK_Employees_Employees FOREIGN KEY (ReportsTo) REFERENCES Employees (EmployeeID);
