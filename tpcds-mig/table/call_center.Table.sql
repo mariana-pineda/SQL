@@ -1,0 +1,36 @@
+
+CREATE TABLE tpcds.call_center (
+	cc_call_center_sk INT NOT NULL, 
+	cc_call_center_id STRING(16) NOT NULL, 
+	cc_rec_start_date DATE, 
+	cc_rec_end_date DATE, 
+	cc_closed_date_sk INT, 
+	cc_open_date_sk INT, 
+	cc_name STRING(50), 
+	cc_class STRING(50), 
+	cc_employees INT, 
+	cc_sq_ft INT, 
+	cc_hours STRING(20), 
+	cc_manager STRING(40), 
+	cc_mkt_id INT, 
+	cc_mkt_class STRING(50), 
+	cc_mkt_desc STRING(100), 
+	cc_market_manager STRING(40), 
+	cc_division INT, 
+	cc_division_name STRING(50), 
+	cc_company INT, 
+	cc_company_name STRING(50), 
+	cc_street_number STRING(10), 
+	cc_street_name STRING(60), 
+	cc_street_type STRING(15), 
+	cc_suite_number STRING(10), 
+	cc_city STRING(60), 
+	cc_county STRING(30), 
+	cc_state STRING(2), 
+	cc_zip STRING(10), 
+	cc_country STRING(20), 
+	cc_gmt_offset DECIMAL(5, 2), 
+	cc_tax_percentage DECIMAL(5, 2)
+);
+
+ALTER TABLE tpcds.call_center ADD CONSTRAINT call_center_pkey PRIMARY KEY (cc_call_center_sk);
