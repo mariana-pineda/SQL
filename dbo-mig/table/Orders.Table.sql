@@ -1,27 +1,26 @@
 
 CREATE TABLE Orders (
-    OrderID BIGINT NOT NULL GENERATED ALWAYS AS IDENTITY,
-    CustomerID STRING,
-    EmployeeID BIGINT,
-    OrderDate TIMESTAMP,
-    RequiredDate TIMESTAMP,
-    ShippedDate TIMESTAMP,
-    ShipVia BIGINT,
-    Freight DECIMAL(19,4) DEFAULT 0,
-    ShipName STRING,
-    ShipAddress STRING,
-    ShipCity STRING,
-    ShipRegion STRING,
-    ShipPostalCode STRING,
-    ShipCountry STRING,
-    PRIMARY KEY (OrderID)
-);
+  OrderID INT NOT NULL GENERATED ALWAYS AS IDENTITY,
+  CustomerID STRING,
+  EmployeeID INT,
+  OrderDate TIMESTAMP,
+  RequiredDate TIMESTAMP,
+  ShippedDate TIMESTAMP,
+  ShipVia INT,
+  Freight DECIMAL(19,4) DEFAULT 0,
+  ShipName STRING,
+  ShipAddress STRING,
+  ShipCity STRING,
+  ShipRegion STRING,
+  ShipPostalCode STRING,
+  ShipCountry STRING
+)
+USING DELTA;
 
-ALTER TABLE Orders ADD CONSTRAINT FK_Orders_Customers 
-FOREIGN KEY (CustomerID) REFERENCES Customers (CustomerID);
+ALTER TABLE Orders ADD CONSTRAINT PK_Orders PRIMARY KEY (OrderID);
 
-ALTER TABLE Orders ADD CONSTRAINT FK_Orders_Employees 
-FOREIGN KEY (EmployeeID) REFERENCES Employees (EmployeeID);
+ALTER TABLE Orders ADD CONSTRAINT FK_Orders_Customers FOREIGN KEY (CustomerID) REFERENCES Customers (CustomerID);
 
-ALTER TABLE Orders ADD CONSTRAINT FK_Orders_Shippers 
-FOREIGN KEY (ShipVia) REFERENCES Shippers (ShipperID);
+ALTER TABLE Orders ADD CONSTRAINT FK_Orders_Employees FOREIGN KEY (EmployeeID) REFERENCES Employees (EmployeeID);
+
+ALTER TABLE Orders ADD CONSTRAINT FK_Orders_Shippers FOREIGN KEY (ShipVia) REFERENCES Shippers (ShipperID);
