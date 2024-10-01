@@ -1,5 +1,5 @@
 
-CREATE VIEW `Orders_Qry` AS
+CREATE OR REPLACE VIEW `Orders Qry` AS
 SELECT Orders.OrderID, Orders.CustomerID, Orders.EmployeeID, Orders.OrderDate, Orders.RequiredDate, 
     Orders.ShippedDate, Orders.ShipVia, Orders.Freight, Orders.ShipName, Orders.ShipAddress, Orders.ShipCity, 
     Orders.ShipRegion, Orders.ShipPostalCode, Orders.ShipCountry, 
