@@ -1,6 +1,6 @@
 
 CREATE OR REPLACE VIEW `Products Above Average Price` AS
-SELECT ProductName, UnitPrice
+SELECT Products.ProductName, Products.UnitPrice
 FROM Products
-WHERE UnitPrice > (SELECT AVG(UnitPrice) FROM Products)
--- ORDER BY UnitPrice DESC
+WHERE Products.UnitPrice > (SELECT AVG(UnitPrice) FROM Products)
+-- ORDER BY Products.UnitPrice DESC
