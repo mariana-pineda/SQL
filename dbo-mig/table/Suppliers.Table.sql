@@ -1,16 +1,17 @@
 
 CREATE TABLE Suppliers (
-  SupplierID INTEGER NOT NULL GENERATED ALWAYS AS IDENTITY, 
-  CompanyName STRING NOT NULL, 
-  ContactName STRING, 
-  ContactTitle STRING, 
-  Address STRING, 
-  City STRING, 
-  Region STRING, 
-  PostalCode STRING, 
-  Country STRING, 
-  Phone STRING, 
-  Fax STRING, 
-  HomePage STRING, 
-  PRIMARY KEY (SupplierID)
-)
+  SupplierID INT NOT NULL,
+  CompanyName STRING NOT NULL,
+  ContactName STRING,
+  ContactTitle STRING,
+  Address STRING,
+  City STRING,
+  Region STRING,
+  PostalCode STRING,
+  Country STRING,
+  Phone STRING,
+  Fax STRING,
+  HomePage STRING
+);
+
+ALTER TABLE Suppliers ADD CONSTRAINT PK_Suppliers PRIMARY KEY (SupplierID);
