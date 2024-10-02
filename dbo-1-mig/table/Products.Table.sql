@@ -9,8 +9,8 @@ CREATE TABLE Products (
     UnitsInStock SMALLINT DEFAULT 0,
     UnitsOnOrder SMALLINT DEFAULT 0,
     ReorderLevel SMALLINT DEFAULT 0,
-    Discontinued BOOLEAN NOT NULL DEFAULT FALSE,
+    Discontinued BOOLEAN NOT NULL DEFAULT false,
     PRIMARY KEY (ProductID),
     FOREIGN KEY (CateryID) REFERENCES Cateries (CateryID),
     FOREIGN KEY (SupplierID) REFERENCES Suppliers (SupplierID)
-);
+)
