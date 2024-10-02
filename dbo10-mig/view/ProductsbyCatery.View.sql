@@ -1,16 +1,16 @@
 
-CREATE OR REPLACE VIEW `Products by Category` AS
+CREATE VIEW `Products by Catery` AS
 SELECT 
-  Cateries.CateryName, 
-  Products.ProductName, 
-  Products.QuantityPerUnit, 
-  Products.UnitsInStock, 
-  Products.Discontinued
+    Cateries.CateryName, 
+    Products.ProductName, 
+    Products.QuantityPerUnit, 
+    Products.UnitsInStock, 
+    Products.Discontinued
 FROM 
-  Cateries 
+    Cateries 
 INNER JOIN 
-  Products 
+    Products 
 ON 
-  Cateries.CateryID = Products.CateryID
+    Cateries.CateryID = Products.CateryID
 WHERE 
-  Products.Discontinued <> 1
+    Products.Discontinued <> 1
