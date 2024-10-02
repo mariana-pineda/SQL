@@ -4,4 +4,4 @@ CREATE TABLE Shippers (
   CompanyName STRING NOT NULL,
   Phone STRING,
   PRIMARY KEY (ShipperID)
-);
+)
