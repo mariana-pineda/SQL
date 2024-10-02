@@ -8,4 +8,4 @@ INNER JOIN `Order Details Extended` ON Products.ProductID = `Order Details Exten
 INNER JOIN Orders ON Orders.OrderID = `Order Details Extended`.OrderID
 WHERE Orders.OrderDate BETWEEN '1997-01-01' AND '1997-12-31'
 GROUP BY Cateries.CateryID, Cateries.CateryName, Products.ProductName
---ORDER BY Products.ProductName
+
