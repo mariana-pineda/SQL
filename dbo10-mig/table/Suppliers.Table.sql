@@ -1,6 +1,6 @@
 
 CREATE TABLE Suppliers (
-  SupplierID INT GENERATED ALWAYS AS IDENTITY,
+  SupplierID INT NOT NULL,
   CompanyName STRING NOT NULL,
   ContactName STRING,
   ContactTitle STRING,
@@ -13,4 +13,4 @@ CREATE TABLE Suppliers (
   Fax STRING,
   HomePage STRING,
   PRIMARY KEY (SupplierID)
-)
+) USING DELTA;
