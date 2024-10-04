@@ -13,8 +13,4 @@ CREATE TABLE Customers (
   Fax STRING
 )
 USING DELTA
-TBLPROPERTIES (
-  'delta.columnMapping.mode' = 'name'
-);
-
-ALTER TABLE Customers ADD CONSTRAINT PK_Customers PRIMARY KEY (CustomerID);
+TBLPROPERTIES ('primaryKey' = 'CustomerID');
