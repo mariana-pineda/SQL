@@ -1,15 +1,8 @@
 
 CREATE TABLE Cateries (
-  CateryID INT NOT NULL, 
+  CateryID INTEGER NOT NULL GENERATED ALWAYS AS IDENTITY, 
   CateryName STRING NOT NULL, 
-  Description STRING, 
-  Picture BINARY, 
-  PRIMARY KEY (CateryID)
+  Description STRING NULL, 
+  Picture BINARY NULL
 );
-
-CREATE SEQUENCE CateryID_seq START WITH 1 INCREMENT BY 1;
-
-CREATE TRIGGER before_insert_Cateries
-BEFORE INSERT ON Cateries
-FOR EACH ROW
-SET NEW.CateryID = nextval('CateryID_seq');
+ALTER TABLE Cateries ADD CONSTRAINT PK_Cateries PRIMARY KEY (CateryID);
