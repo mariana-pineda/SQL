@@ -11,6 +11,6 @@ CREATE TABLE Customers (
   Country STRING, 
   Phone STRING, 
   Fax STRING
-)
-USING DELTA
-TBLPROPERTIES ('primaryKey' = 'CustomerID');
+);
+
+ALTER TABLE Customers ADD CONSTRAINT PK_Customers PRIMARY KEY (CustomerID);
