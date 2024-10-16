@@ -1,6 +1,5 @@
 
 CREATE OR REPLACE VIEW `Alphabetical list of products` AS
-SELECT Products.*, Cateries.CateryName
-FROM Cateries
-INNER JOIN Products ON Cateries.CateryID = Products.CateryID
+SELECT Products.*, Categories.CategoryName
+FROM Categories INNER JOIN Products ON Categories.CategoryID = Products.CategoryID
 WHERE Products.Discontinued = 0
