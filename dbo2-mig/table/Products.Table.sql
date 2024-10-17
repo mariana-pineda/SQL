@@ -1,0 +1,19 @@
+
+CREATE TABLE Products (
+  ProductID INTEGER NOT NULL GENERATED ALWAYS AS IDENTITY,
+  ProductName STRING NOT NULL,
+  SupplierID INTEGER,
+  CateryID INTEGER,
+  QuantityPerUnit STRING,
+  UnitPrice DECIMAL(19, 4) NULL DEFAULT 0,
+  UnitsInStock SMALLINT NULL DEFAULT 0,
+  UnitsOnOrder SMALLINT NULL DEFAULT 0,
+  ReorderLevel SMALLINT NULL DEFAULT 0,
+  Discontinued BOOLEAN NOT NULL DEFAULT false
+);
+
+ALTER TABLE Products ADD CONSTRAINT PK_Products PRIMARY KEY (ProductID);
+
+ALTER TABLE Products ADD CONSTRAINT FK_Products_Cateries FOREIGN KEY (CateryID) REFERENCES Cateries (CateryID);
+
+ALTER TABLE Products ADD CONSTRAINT FK_Products_Suppliers FOREIGN KEY (SupplierID) REFERENCES Suppliers (SupplierID);
