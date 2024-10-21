@@ -5,4 +5,4 @@ CREATE TABLE Cateries (
   Description STRING,
   Picture BINARY,
   PRIMARY KEY (CateryID)
-)
+);
