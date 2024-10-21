@@ -1,5 +1,5 @@
 
-CREATE OR REPLACE VIEW `Orders_Qry` AS
+CREATE OR REPLACE VIEW `Orders Qry` AS
 SELECT 
     Orders.OrderID, 
     Orders.CustomerID, 
@@ -21,10 +21,5 @@ SELECT
     Customers.Region, 
     Customers.PostalCode, 
     Customers.Country
-FROM 
-    Customers 
-INNER JOIN 
-    Orders 
-ON 
-    Customers.CustomerID = Orders.CustomerID
-
+FROM Customers 
+INNER JOIN Orders ON Customers.CustomerID = Orders.CustomerID
