@@ -1,5 +1,5 @@
 
-CREATE VIEW `Products_Above_Average_Price` AS
+CREATE VIEW `Products Above Average Price` AS
 SELECT Products.ProductName, Products.UnitPrice
 FROM Products
 WHERE Products.UnitPrice > (SELECT AVG(UnitPrice) FROM Products)
