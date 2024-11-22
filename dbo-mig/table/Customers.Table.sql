@@ -1,7 +1,7 @@
 
 CREATE TABLE Customers (
-  CustomerID STRING NOT NULL, 
-  CompanyName STRING NOT NULL, 
+  CustomerID STRING NOT NULL,
+  CompanyName STRING NOT NULL,
   ContactName STRING, 
   ContactTitle STRING, 
   Address STRING, 
@@ -12,5 +12,6 @@ CREATE TABLE Customers (
   Phone STRING, 
   Fax STRING, 
   PRIMARY KEY (CustomerID)
-) USING DELTA
+)
+USING DELTA
 
