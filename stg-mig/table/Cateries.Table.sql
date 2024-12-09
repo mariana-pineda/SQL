@@ -1,0 +1,8 @@
+
+CREATE TABLE Cateries (
+  CateryID INTEGER GENERATED ALWAYS AS IDENTITY,
+  CateryName STRING NOT NULL,
+  Description STRING,
+  Picture BINARY,
+  PRIMARY KEY (CateryID)
+)
