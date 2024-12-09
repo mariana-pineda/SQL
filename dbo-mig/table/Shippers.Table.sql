@@ -1,0 +1,6 @@
+
+CREATE TABLE Shippers (
+    ShipperID INT GENERATED ALWAYS AS IDENTITY,
+    CompanyName STRING NOT NULL,
+    Phone STRING
+);
