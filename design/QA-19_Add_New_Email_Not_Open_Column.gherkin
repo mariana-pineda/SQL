@@ -1,0 +1,26 @@
+Feature: Add NOT_OPENED_EMAIL column to track unopened emails
+
+  Scenario: Add NOT_OPENED_EMAIL column to the table
+    Given a table with columns IS_CLICKED and IS_OPENED
+    When a new column named NOT_OPENED_EMAIL is added
+    Then the column should be initialized with a default value
+
+  Scenario: Mark NOT_OPENED_EMAIL as TRUE for unopened emails
+    Given a row in the table where IS_CLICKED is TRUE and IS_OPENED is FALSE
+    When the NOT_OPENED_EMAIL column is updated
+    Then NOT_OPENED_EMAIL should be TRUE
+
+  Scenario: Do not mark NOT_OPENED_EMAIL as TRUE for opened emails
+    Given a row in the table where IS_CLICKED is TRUE and IS_OPENED is TRUE
+    When the NOT_OPENED_EMAIL column is updated
+    Then NOT_OPENED_EMAIL should be FALSE
+
+  Scenario: Handle rows with missing IS_CLICKED or IS_OPENED values
+    Given a row in the table where IS_CLICKED or IS_OPENED is NULL
+    When the NOT_OPENED_EMAIL column is updated
+    Then NOT_OPENED_EMAIL should remain unchanged or set to a default value
+
+  Scenario: Handle rows with unknown email status
+    Given a row in the table where email status is unknown
+    When the NOT_OPENED_EMAIL column is updated
+    Then NOT_OPENED_EMAIL should remain unchanged or set to a default value
