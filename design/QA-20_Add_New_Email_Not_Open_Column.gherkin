@@ -1,0 +1,14 @@
+Feature: Add NOT_OPENED_EMAIL column to track unopened emails
+
+  Scenario: Mark email as not opened when clicked but not opened
+    Given a data table with columns "IS_CLICKED" and "IS_OPENED"
+      | IS_CLICKED | IS_OPENED |
+      | TRUE       | FALSE     |
+      | TRUE       | TRUE      |
+      | FALSE      | FALSE     |
+    When a new column "NOT_OPENED_EMAIL" is added
+    Then the "NOT_OPENED_EMAIL" column should be TRUE for rows where "IS_CLICKED" is TRUE and "IS_OPENED" is FALSE
+      | IS_CLICKED | IS_OPENED | NOT_OPENED_EMAIL |
+      | TRUE       | FALSE     | TRUE             |
+      | TRUE       | TRUE      | FALSE            |
+      | FALSE      | FALSE     | FALSE            |
