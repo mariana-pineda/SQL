@@ -3,11 +3,13 @@ Feature: Train a Random Forest Model on Wine Dataset
   Background:
     Given the wine dataset is located at "/dbfs/databricks-datasets/wine-quality/winequality-white.csv"
     And the dataset uses ";" as a separator
-    And the last column "quality" should be replaced with "high_quality" where true if quality > 6, otherwise false
 
-  Scenario: Train and Validate Random Forest Model
-    Given the data is split into 60% for training, 20% for validation, and 20% for testing
-    When I train a random forest model on the training data
-    Then I store the experiment in "/Workspace/Shared/purgo_poc/winequality-experiement"
-    And I validate the model using the validation data
-    And I test the model using the test data
+  Scenario: Train and Evaluate Random Forest Model
+    Given the data is loaded from the specified path
+    When the data is split into 60% training, 20% validation, and 20% test sets
+    And the "quality" column is transformed to "high_quality" with true if quality > 6, otherwise false
+    And a new column "timestamp" is added with the current timestamp
+    And a Random Forest model is trained on the training set
+    Then the model is validated on the validation set
+    And the model is tested on the test set
+    And the experiment is stored in "/Workspace/Shared/purgo_poc/winequality-experiement"
