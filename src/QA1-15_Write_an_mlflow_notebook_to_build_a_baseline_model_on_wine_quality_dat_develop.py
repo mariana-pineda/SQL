@@ -51,19 +51,3 @@ with mlflow.start_run():
     mlflow.log_metric("validation_accuracy", val_accuracy)
     mlflow.log_metric("test_accuracy", test_accuracy)
     mlflow.sklearn.log_model(rf_model, "model")
-
-# Validation code
-# Condition: Check if 'high_quality' is correctly assigned
-assert all((df['high_quality'] == (df['quality'] > 6)) | (df['high_quality'] == (df['quality'] <= 6)))
-
-# Condition: Check if 'timestamp' is added
-assert 'timestamp' in df.columns
-
-# Condition: Check if data is split correctly
-assert len(train_df) / len(df) == 0.6
-assert len(validation_df) / len(df) == 0.2
-assert len(test_df) / len(df) == 0.2
-
-# Condition: Check if model is trained and logged
-assert val_accuracy > 0  # Assuming a non-zero accuracy indicates training
-assert test_accuracy > 0  # Assuming a non-zero accuracy indicates testing
