@@ -1,0 +1,24 @@
+Feature: Calculate Applied Quantity (apl_qty) in Inventory Transactions
+
+  Background:
+    Given the following inventory transaction data:
+      | txn_id | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty |
+      | 1      | 50          | 100                | 90                           | 50                | 40                       | 30                                 |
+      | 2      | -10         | 80                 | 70                           | 40                | 50                       | 45                                 |
+      | 3      | 20          | 60                 | 100                          | 30                | 30                       | 25                                 |
+
+  Scenario Outline: Calculate apl_qty based on conditions
+    Given a transaction with ref_txn_qty <ref_txn_qty>, cumulative_txn_qty <cumulative_txn_qty>, cumulative_ref_ord_sched_qty <cumulative_ref_ord_sched_qty>, ref_ord_sched_qty <ref_ord_sched_qty>, prior_cumulative_txn_qty <prior_cumulative_txn_qty>, and prior_cumulative_ref_ord_sched_qty <prior_cumulative_ref_ord_sched_qty>
+    When calculating the apl_qty
+    Then the apl_qty should be <expected_apl_qty>
+
+    Examples:
+      | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty | expected_apl_qty |
+      | 50          | 100                | 90                           | 50                | 40                       | 30                                 | 40               |
+      | -10         | 80                 | 70                           | 40                | 50                       | 45                                 | -10              |
+      | 20          | 60                 | 100                          | 30                | 30                       | 25                                 | 20               |
+
+  Scenario: Default condition when no specific conditions are met
+    Given a transaction with ref_txn_qty 0, cumulative_txn_qty 0, cumulative_ref_ord_sched_qty 0, ref_ord_sched_qty 0, prior_cumulative_txn_qty 0, and prior_cumulative_ref_ord_sched_qty 0
+    When calculating the apl_qty
+    Then the apl_qty should be NULL
