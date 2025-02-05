@@ -5,3 +5,4 @@ FROM Customers
 UNION 
 SELECT City, CompanyName, ContactName, 'Suppliers' AS Relationship
 FROM Suppliers
+
