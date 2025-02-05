@@ -1,5 +1,5 @@
 
-CREATE VIEW `Products by Catery` AS
+CREATE VIEW `Products_by_Category` AS
 SELECT 
   Cateries.CateryName, 
   Products.ProductName, 
@@ -13,5 +13,5 @@ INNER JOIN
 ON 
   Cateries.CateryID = Products.CateryID
 WHERE 
-  Products.Discontinued != 1
+  Products.Discontinued <> 1
 
