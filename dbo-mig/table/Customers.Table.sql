@@ -13,4 +13,5 @@ CREATE TABLE Customers (
   Fax STRING
 ) USING DELTA;
 
-ALTER TABLE Customers ADD CONSTRAINT PK_Customers PRIMARY KEY (CustomerID);
+ALTER TABLE Customers
+ADD CONSTRAINT PK_Customers PRIMARY KEY (CustomerID);
