@@ -1,6 +1,6 @@
 
 CREATE TABLE Orders (
-  OrderID INT GENERATED ALWAYS AS IDENTITY,
+  OrderID INT NOT NULL GENERATED ALWAYS AS IDENTITY,
   CustomerID STRING NULL,
   EmployeeID INT NULL,
   OrderDate TIMESTAMP NULL,
@@ -16,10 +16,10 @@ CREATE TABLE Orders (
   ShipCountry STRING NULL
 );
 
--- Adding PRIMARY KEY constraint
 ALTER TABLE Orders ADD CONSTRAINT PK_Orders PRIMARY KEY (OrderID);
 
--- Adding FOREIGN KEY constraints
-ALTER TABLE Orders ADD CONSTRAINT FK_Orders_Customers FOREIGN KEY (CustomerID) REFERENCES Customers (CustomerID);
-ALTER TABLE Orders ADD CONSTRAINT FK_Orders_Employees FOREIGN KEY (EmployeeID) REFERENCES Employees (EmployeeID);
-ALTER TABLE Orders ADD CONSTRAINT FK_Orders_Shippers FOREIGN KEY (ShipVia) REFERENCES Shippers (ShipperID);
+ALTER TABLE Orders ADD CONSTRAINT FK_Orders_Customers FOREIGN KEY(CustomerID) REFERENCES Customers(CustomerID);
+
+ALTER TABLE Orders ADD CONSTRAINT FK_Orders_Employees FOREIGN KEY(EmployeeID) REFERENCES Employees(EmployeeID);
+
+ALTER TABLE Orders ADD CONSTRAINT FK_Orders_Shippers FOREIGN KEY(ShipVia) REFERENCES Shippers(ShipperID);
