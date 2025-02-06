@@ -14,7 +14,7 @@ SELECT
   Customers.Region, 
   Customers.PostalCode, 
   Customers.Country, 
-  CONCAT(Employees.FirstName, ' ', Employees.LastName) AS Salesperson, 
+  CONCAT(FirstName, ' ', LastName) AS Salesperson, 
   Orders.OrderID, 
   Orders.OrderDate, 
   Orders.RequiredDate, 
@@ -25,7 +25,7 @@ SELECT
   `Order Details`.UnitPrice, 
   `Order Details`.Quantity, 
   `Order Details`.Discount, 
-  CAST(`Order Details`.UnitPrice * `Order Details`.Quantity * (1 - `Order Details`.Discount) AS DECIMAL(18, 2)) AS ExtendedPrice, 
+  CAST(`Order Details`.UnitPrice * Quantity * (1 - Discount) AS DECIMAL(38, 4)) AS ExtendedPrice, 
   Orders.Freight
 FROM 
   Shippers 
