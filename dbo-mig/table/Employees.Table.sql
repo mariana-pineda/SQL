@@ -1,6 +1,6 @@
 
 CREATE TABLE Employees (
-  EmployeeID INT NOT NULL GENERATED ALWAYS AS IDENTITY,
+  EmployeeID INTEGER NOT NULL GENERATED ALWAYS AS IDENTITY,
   LastName STRING NOT NULL,
   FirstName STRING NOT NULL,
   Title STRING,
@@ -16,10 +16,12 @@ CREATE TABLE Employees (
   Extension STRING,
   Photo BINARY,
   Notes STRING,
-  ReportsTo INT,
+  ReportsTo INTEGER,
   PhotoPath STRING
-);
+) USING DELTA;
 
-ALTER TABLE Employees ADD CONSTRAINT PK_Employees PRIMARY KEY (EmployeeID);
+ALTER TABLE Employees
+ADD CONSTRAINT PK_Employees PRIMARY KEY (EmployeeID);
 
-ALTER TABLE Employees ADD CONSTRAINT FK_Employees_Employees FOREIGN KEY (ReportsTo) REFERENCES Employees (EmployeeID);
+ALTER TABLE Employees
+ADD CONSTRAINT FK_Employees_Employees FOREIGN KEY (ReportsTo) REFERENCES Employees (EmployeeID);
