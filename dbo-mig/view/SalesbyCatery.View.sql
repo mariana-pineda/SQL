@@ -1,10 +1,12 @@
 
-CREATE OR REPLACE VIEW `Sales by Catery` AS
-SELECT Cateries.CateryID, Cateries.CateryName, Products.ProductName, 
-  SUM(`Order Details Extended`.ExtendedPrice) AS ProductSales
-FROM Cateries 
-INNER JOIN Products ON Cateries.CateryID = Products.CateryID
-INNER JOIN Orders ON Orders.OrderID = `Order Details Extended`.OrderID
-INNER JOIN `Order Details Extended` ON Products.ProductID = `Order Details Extended`.ProductID
-WHERE Orders.OrderDate BETWEEN '1997-01-01' AND '1997-12-31'
-GROUP BY Cateries.CateryID, Cateries.CateryName, Products.ProductName;
+CREATE VIEW `Sales by Catery` AS
+SELECT C.CateryID, C.CateryName, P.ProductName, 
+       SUM(ODE.ExtendedPrice) AS ProductSales
+FROM Cateries C
+INNER JOIN Products P ON C.CateryID = P.CateryID
+INNER JOIN `Order Details Extended` ODE ON P.ProductID = ODE.ProductID
+INNER JOIN Orders O ON O.OrderID = ODE.OrderID
+WHERE O.OrderDate BETWEEN '1997-01-01' AND '1997-12-31'
+GROUP BY C.CateryID, C.CateryName, P.ProductName
+--ORDER BY P.ProductName
+
