@@ -1,8 +1,6 @@
 
 CREATE TABLE CustomerDemographics (
   CustomerTypeID STRING NOT NULL,
-  CustomerDesc STRING NULL
+  CustomerDesc STRING,
+  PRIMARY KEY (CustomerTypeID)
 )
-USING DELTA
-COMMENT 'Table with customer demographics'
-TBLPROPERTIES ('primary_key_columns' = 'CustomerTypeID');
