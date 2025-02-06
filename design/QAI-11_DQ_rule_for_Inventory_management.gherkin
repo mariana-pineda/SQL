@@ -1,0 +1,36 @@
+Feature: Data Quality Checks for Drug Inventory Management
+
+  Background:
+    Given the data quality rules are defined in the DQ_rules_IM sheet of data_quality_mapping.xlsx
+    And the drug_inventory_management table is located in agilisium_playground.purgo_playground
+
+  Scenario: Implement Data Quality Checks
+    Given I have access to the drug_inventory_management table
+    When I apply the data quality rules from the DQ_rules_IM sheet
+    Then I should create a data quality dataframe with the following structure:
+      | check_name | result | pass_% |
+
+  Scenario: Calculate Pass Percentage
+    Given the total number of rows in the drug_inventory_management table
+    When I evaluate each data quality rule
+    Then I calculate the pass percentage as the number of rows passing the check divided by the total number of rows
+
+  Scenario: Determine Result for Each Check
+    Given the evaluation of each data quality rule
+    When a rule is applied to the data
+    Then the result should be "pass" if all rows meet the rule criteria, otherwise "fail"
+
+  Scenario: Notification of Rule Violations
+    Given a data quality rule is violated
+    When the result of a check is "fail"
+    Then a notification should be sent to the relevant stakeholders
+
+  Scenario: Access and Schema Verification
+    Given the need to apply data quality checks
+    When accessing the drug_inventory_management table
+    Then verify access permissions and obtain the table schema
+
+  Scenario: Ensure Attachment Accessibility
+    Given the data quality rules are in the data_quality_mapping.xlsx file
+    When accessing the file
+    Then ensure it is accessible and verify its contents for accuracy
