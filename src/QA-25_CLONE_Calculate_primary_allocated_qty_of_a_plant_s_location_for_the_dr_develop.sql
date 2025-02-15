@@ -1,17 +1,24 @@
--- Use the desired schema
+-- Switch to the relevant database
 USE purgo_playground;
 
--- SQL Logic to calculate allocated_qty in the inventory stock management table 'f_order'
--- Allocated quantity is calculated by summing primary_qty, open_qty, shipped_qty, and cancel_qty
+-- SQL logic to calculate allocated_qty in the inventory stock management table 'f_order'
 
--- Create or replace the view to encapsulate the logic
-CREATE OR REPLACE VIEW allocated_qty_view AS
+/*
+   Calculate the allocated quantity for each order in the 'f_order' table by summing the 
+   primary_qty, open_qty, shipped_qty, and cancel_qty. The results are stored in the 
+   allocated_qty field.
+*/
+
+-- Create or replace temporary view to calculate allocated_qty
+CREATE OR REPLACE TEMPORARY VIEW f_order_allocated AS
 SELECT 
-    o.order_nbr,
+    o.order_nbr, 
     o.order_line_nbr,
-    i.txn_id,
-    -- Calculate allocated_qty by summing respective quantity fields
-    COALESCE(o.primary_qty, 0) + COALESCE(o.open_qty, 0) + COALESCE(o.shipped_qty, 0) + COALESCE(o.cancel_qty, 0) AS allocated_qty
+    /* Calculate allocated_qty by summing primary_qty, open_qty, shipped_qty, and cancel_qty */
+    COALESCE(o.primary_qty, 0) + 
+    COALESCE(o.open_qty, 0) + 
+    COALESCE(o.shipped_qty, 0) + 
+    COALESCE(o.cancel_qty, 0) AS allocated_qty
 FROM 
     purgo_playground.f_order o
 JOIN 
@@ -22,54 +29,40 @@ WHERE
     o.order_nbr IS NOT NULL 
     AND o.order_line_nbr IS NOT NULL;
 
--- Enable Delta Lake features for the table
-ALTER TABLE purgo_playground.f_order 
-SET TBLPROPERTIES (
-    "delta.autoOptimize.optimizeWrite" = true,
-    "delta.autoOptimize.autoCompact" = true
-);
+/*
+   Perform Delta Lake operations for data versioning and optimization
+   MERGE can be used to update existing records when necessary.
+*/
 
--- Example usage of the view to fetch allocated quantities
-SELECT 
-    order_nbr,
-    order_line_nbr,
-    allocated_qty
-FROM 
-    allocated_qty_view;
-
--- Additional logic to update f_order table using Delta Lake MERGE operation for allocated quantities
+/* Define the merge operation to update the 'allocated_qty' in the table */
 MERGE INTO purgo_playground.f_order AS target
-USING (
-  SELECT 
-    order_nbr, 
-    order_line_nbr, 
-    COALESCE(primary_qty, 0) + COALESCE(open_qty, 0) + COALESCE(shipped_qty, 0) + COALESCE(cancel_qty, 0) AS calculated_allocated_qty
-  FROM 
-    purgo_playground.f_order
-) AS source
-ON target.order_nbr = source.order_nbr AND target.order_line_nbr = source.order_line_nbr
-WHEN MATCHED THEN
-  UPDATE SET target.allocated_qty = source.calculated_allocated_qty;
+USING f_order_allocated AS source
+ON 
+    target.order_nbr = source.order_nbr 
+    AND target.order_line_nbr = source.order_line_nbr
+WHEN MATCHED THEN 
+    UPDATE SET 
+        target.allocated_qty = source.allocated_qty;
 
--- Error handling and validation logic
--- Example: Log and handle invalid and negative quantities
+/*
+   Data quality and validation checks for NULL values and negative quantity scenarios
+   Ensure allocated_qty does not fall into invalid value ranges
+*/
 SELECT 
     order_nbr,
-    order_line_nbr,
-    -- Check for negative quantities
+    allocated_qty,
     CASE 
-        WHEN primary_qty < 0 OR open_qty < 0 OR shipped_qty < 0 OR cancel_qty < 0 
-        THEN 'Warning: Negative quantity found'
-        ELSE 'Quantity valid'
-    END AS validation_status
+        WHEN COALESCE(allocated_qty, 0) < 0 THEN 'Warning: Negative quantity detected'
+        ELSE 'Pass'
+    END AS Validation_Status
 FROM 
-    purgo_playground.f_order;
+    purgo_playground.f_order
+WHERE 
+    order_nbr IS NOT NULL;
 
--- Note: Vacuum the f_order table to remove old files and optimize performance
--- Execute this step during maintenance as needed
-VACUUM purgo_playground.f_order RETAIN 168 HOURS;
+-- If VACUUM is required, ensure correct syntax and that the command is appropriate for your environment
+-- Note: Direct execution of VACUUM might not be supported in a SQL block; it usually needs to be run separately or with special permissions
 
--- Set up Z-ordering based on frequently queried fields
-OPTIMIZE purgo_playground.f_order
-ZORDER BY (order_nbr, order_line_nbr);
-
+-- OPTIMIZE operation can be used without triggering syntax errors if run separately
+-- Uncomment and adjust the following line if necessary, and ensure permissions support this operation:
+-- OPTIMIZE purgo_playground.f_order ZORDER BY (order_nbr, order_line_nbr);
