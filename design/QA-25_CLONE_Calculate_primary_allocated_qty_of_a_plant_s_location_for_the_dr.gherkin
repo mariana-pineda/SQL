@@ -1,57 +1,53 @@
-Feature: Calculation of Allocated Quantity
-
-  As a database engineer, I want to calculate the allocated quantity 
-  in the inventory stock management table 'f_order' so that it reflects 
-  how much of the plant’s inventory has been committed to specific uses.
+Feature: Calculate Allocated Quantity for Inventory Stock Management
 
   Background:
-    Given a connection to the purgo_playground database
-    And a leading table named f_inv_movmnt
+    Given the leading table "f_inv_movmnt" is used to manage inventory movements
+    And "f_order" table is used to gather committed quantities for specific orders
 
-  Scenario: Calculate allocated quantity for valid orders
-    Given the order number and order line number exist in table f_order
-    When I query the f_order to sum primary_qty, open_qty, shipped_qty, and cancel_qty
-    Then the result should be stored as allocated_qty
+  Scenario: Calculate allocated_qty for a single order
+    Given an order exists in the "f_order" table with order_nbr "ORD001" and order_line_nbr "001"
+    When I retrieve the primary_qty of 100.0, open_qty of 50.0, shipped_qty of 30.0, and cancel_qty of 5.0
+    Then the allocated_qty should be 185.0
 
-  Scenario Outline: Validate allocated quantity calculation
-    Given the order_nbr is "<order_nbr>" and order_line_nbr is "<order_line_nbr>"
-    And primary_qty is "<primary_qty>"
-    And open_qty is "<open_qty>"
-    And shipped_qty is "<shipped_qty>"
-    And cancel_qty is "<cancel_qty>"
-    When I calculate allocated_qty as primary_qty + open_qty + shipped_qty + cancel_qty
-    Then the allocated_qty should be "<allocated_qty>"
+  Scenario Outline: Calculate allocated_qty for multiple orders
+    Given an order exists in the "f_order" table with order_nbr "<order_nbr>" and order_line_nbr "<order_line_nbr>"
+    When I retrieve the primary_qty of <primary_qty>, open_qty of <open_qty>, shipped_qty of <shipped_qty>, and cancel_qty of <cancel_qty>
+    Then the allocated_qty should be <allocated_qty>
 
     Examples:
       | order_nbr | order_line_nbr | primary_qty | open_qty | shipped_qty | cancel_qty | allocated_qty |
-      | 001       | 0011           | 10          | 5        | 2           | 1          | 18            |
-      | 002       | 0012           | 20          | 0        | 3           | 2          | 25            |
+      | ORD002    | 001            | 150.0       | 70.0     | 40.0        | 10.0       | 270.0         |
+      | ORD003    | 002            | 120.0       | 60.0     | 20.0        | 0.0        | 200.0         |
 
-  Scenario: Handle missing records in f_order
-    Given there are no entries in f_order for a specific order_nbr and order_line_nbr
-    When I attempt to calculate allocated_qty
-    Then I should receive an error message "Order not found"
-    And the allocated_qty should be set to "0"
+  Scenario: Error handling when quantities are missing
+    Given an order exists in the "f_order" table with order_nbr "ORD004" and order_line_nbr "003"
+    When the primary_qty is missing
+    Then an error message should be "Primary quantity is required for allocated quantity calculation"
 
-  Scenario: Handle invalid data types
-    Given primary_qty in f_order is not a number
-    When I try to calculate allocated_qty
-    Then I should receive an error message "Invalid data type for quantities"
+  Scenario: Handling of negative quantities and cancellations
+    Given an order exists in the "f_order" table with order_nbr "ORD005" and order_line_nbr "004"
+    When I retrieve a negative primary_qty of -50.0, open_qty of 20.0, shipped_qty of 10.0, and cancel_qty of 15.0
+    Then an error message should be "Negative primary quantity is not allowed for allocated quantity calculation"
 
-  Scenario: Handle negative quantities
-    Given a negative value in primary_qty, open_qty, shipped_qty, or cancel_qty
-    When I perform the calculation for allocated_qty
-    Then I should receive a warning message "Negative quantity not allowed"
+  Scenario: Overlapping entries for order_nbr and order_line_nbr
+    Given multiple entries exist in the "f_order" table for order_nbr "ORD006" and order_line_nbr "005"
+    When I calculate the allocated_qty
+    Then ensure no duplicate calculations occur by handling overlaps
 
-  Scenario: SQL logic for allocated_qty calculation
-    Given a SQL logic to calculate allocated_qty
-    When joining f_inv_movmnt with f_order on order_nbr and order_line_nbr
-    Then calculate allocated_qty as 
-    """
-    SELECT o.order_nbr, o.order_line_nbr,
-           (o.primary_qty + o.open_qty + o.shipped_qty + o.cancel_qty) AS allocated_qty 
-    FROM purgo_playground.f_order o
-    JOIN purgo_playground.f_inv_movmnt i
-    ON o.order_nbr = i.txn_id
-    WHERE o.order_nbr IS NOT NULL AND o.order_line_nbr IS NOT NULL;
-    """
+  Scenario: Dependency on external inventory updates
+    Given the latest inventory data in the "f_inv_movmnt" table depends on external updates
+    When updates are delayed or missing
+    Then the "allocated_qty" calculation should be based on the most recent synchronized data
+    And a warning message "Inventory data might be outdated" should be logged
+
+# SQL pseudo logic
+# SELECT 
+#   order_nbr, order_line_nbr, 
+#   CASE 
+#     WHEN primary_qty IS NULL THEN RAISE_ERROR('Primary quantity is required for allocated quantity calculation')
+#     WHEN primary_qty < 0 THEN RAISE_ERROR('Negative primary quantity is not allowed for allocated quantity calculation')
+#     ELSE COALESCE(primary_qty, 0) + COALESCE(open_qty, 0) + COALESCE(shipped_qty, 0) + COALESCE(cancel_qty, 0)
+#   END AS allocated_qty
+# FROM purgo_playground.f_order
+# WHERE EXISTS 
+#   (SELECT 1 FROM purgo_playground.f_inv_movmnt WHERE order_nbr = f_order.order_nbr AND order_line_nbr = f_order.order_line_nbr);
