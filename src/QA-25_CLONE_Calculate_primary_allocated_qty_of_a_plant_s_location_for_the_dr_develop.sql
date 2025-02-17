@@ -1,52 +1,39 @@
--- Create table for storing allocated quantities calculation results
-CREATE TABLE IF NOT EXISTS purgo_playground.allocated_qty_results (
-  order_nbr STRING,
-  order_line_nbr STRING,
-  allocated_qty DOUBLE,
-  crt_dt TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
-  updt_dt TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
-);
-
--- Calculate allocated_qty for inventory stock management
-INSERT INTO purgo_playground.allocated_qty_results 
+-- Create temporary view to calculate allocated quantities based on criteria
+CREATE OR REPLACE TEMP VIEW allocated_qty_calc AS
 SELECT 
   order_nbr, 
-  order_line_nbr, 
-  -- Calculate allocated_qty by summing up relevant quantities
+  order_line_nbr,
+  -- Calculate allocated quantity with error handling for missing or negative primary_qty
   CASE 
-    WHEN primary_qty IS NULL THEN CAST(NULL AS DOUBLE)  -- Handle missing primary_qty
-    WHEN primary_qty < 0 THEN CAST(NULL AS DOUBLE) -- Handle negative primary_qty
+    WHEN primary_qty IS NULL THEN RAISE_ERROR("Primary quantity is required for allocated quantity calculation")
+    WHEN primary_qty < 0 THEN RAISE_ERROR("Negative primary quantity is not allowed for allocated quantity calculation")
     ELSE COALESCE(primary_qty, 0) + COALESCE(open_qty, 0) + COALESCE(shipped_qty, 0) + COALESCE(cancel_qty, 0)
   END AS allocated_qty
-FROM purgo_playground.f_order
-WHERE EXISTS (
-  SELECT 1 
-  FROM purgo_playground.f_inv_movmnt
-  WHERE f_order.order_nbr = f_inv_movmnt.order_nbr 
-    AND f_order.order_line_nbr = f_inv_movmnt.order_line_nbr
+FROM 
+  purgo_playground.f_order
+WHERE 
+  EXISTS (
+    -- Ensure the order exists in the f_inv_movmnt table for integrity
+    SELECT 1 
+    FROM purgo_playground.f_inv_movmnt 
+    WHERE order_nbr = f_order.order_nbr 
+      AND order_line_nbr = f_order.order_line_nbr
+  );
+
+-- Create or replace the table to store allocated quantities
+CREATE TABLE IF NOT EXISTS purgo_playground.f_order_allocated_qty (
+  order_nbr STRING,
+  order_line_nbr STRING,
+  allocated_qty DOUBLE
 );
 
--- Data quality checks to identify missing or negative primary_qty
-SELECT 
-  order_nbr, 
-  order_line_nbr,
-  'Primary quantity is required for allocated quantity calculation' AS error_message
-FROM purgo_playground.f_order
-WHERE primary_qty IS NULL
-UNION
-SELECT 
-  order_nbr, 
-  order_line_nbr,
-  'Negative primary quantity is not allowed for allocated quantity calculation' AS error_message
-FROM purgo_playground.f_order
-WHERE primary_qty < 0;
+-- Insert calculated allocated_qty into the target table
+INSERT INTO purgo_playground.f_order_allocated_qty
+SELECT * FROM allocated_qty_calc;
 
--- Optimize Delta Table for performance using Z-Ordering
--- Note: This should be run on Databricks environment that supports DELTA optimization
-OPTIMIZE purgo_playground.allocated_qty_results
+-- Optimize the table for better performance using ZORDER
+OPTIMIZE purgo_playground.f_order_allocated_qty
 ZORDER BY (order_nbr, order_line_nbr);
 
--- Schedule vacuum to maintain storage efficiency by removing old versions
--- Note: This should be run on Databricks environment that supports DELTA vacuuming
-VACUUM purgo_playground.allocated_qty_results RETAIN 168 HOURS;
-
+-- Optionally run vacuum to remove old versions, retaining data for 168 hours
+VACUUM purgo_playground.f_order_allocated_qty RETAIN 168 HOURS;
