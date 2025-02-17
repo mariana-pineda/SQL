@@ -1,58 +1,47 @@
 from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, when, current_timestamp
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, TimestampType
-from pyspark.sql.functions import lit, current_timestamp
 
+# Initialize Spark session
 spark = SparkSession.builder \
     .appName("Test Data Generation") \
     .getOrCreate()
 
-# Define schema for the target table
+# Define schema for the input data
 schema = StructType([
     StructField("product_id", StringType(), True),
     StructField("product_description", StringType(), True),
-    StructField("product_size", StringType(), True),
     StructField("dimension_1", DoubleType(), True),
     StructField("dimension_2", DoubleType(), True),
-    StructField("dimension_3", DoubleType(), True),
-    StructField("timestemp", TimestampType(), True)
+    StructField("dimension_3", DoubleType(), True)
 ])
 
-# Create a list of test records
+# Sample data
 data = [
-    # Happy path scenario with valid product size extraction
-    ("YRDMT-6061-T6511-TB-3.7500-.3750-23.7000", 
-     "ALUM EXTRUDED ROUND TUBE - BAR - 1-Aluminum Bar - 6061-T6511-TB - 6061-T6511-TB-3.7500-.3750-23.7000", 
-     "3.7500-.3750-23.7000", 3.75, 3.0, 0.375, None),
-
-    # Edge case with boundary condition in sizes
-    ("YRDMT-6061-T6511-TB-0.0000-0.0000-0.0000", 
-     "ALUM EXTRUDED ROUND TUBE - BAR - 1-Aluminum Bar - 6061-T6511-TB - BOUNDARY-0.0000-0.0000-0.0000", 
-     "0.0000-0.0000-0.0000", 0.0, 0.0, 0.0, None),
-
-    # Error scenario with invalid combination
-    ("YRDMT-9999", 
-     "INVALID PRODUCT DESCRIPTION with invalid format", 
-     None, None, None, None, None),
-
-    # NULL handling scenario, product description missing but product_id used
-    ("YRDMT-7075-T73-TB-2.8750", 
-     None, 
-     "2.8750", None, None, None, None),
-
-    # Special characters and multibyte characters in description
-    ("YRDMT-8888", 
-     "ALUM EXTRUDED ROUND TUBE - さよなら - MULTIBYTE TEST", 
-     None, None, None, None, None)
+    # Happy path test data
+    ("YRDMT-6061-T6511-TB-3.7500-.3750-23.7000", "ALUM EXTRUDED ROUND TUBE - BAR - 1-Aluminum Bar - 6061-T6511-TB - 6061-T6511-TB-3.7500-.3750-23.7000", 3.75, 3.0, 0.375),
+    # Edge case: Minimum dimension values
+    ("YRDMT-6061-T6511-TB-0.0001-0.0001-0.0001", "ALUM EXTRUDED ROUND TUBE - BAR - 1-Aluminum Bar - 6061-T6511-TB - 6061-T6511-TB-0.0001-0.0001-0.0001", 0.0001, 0.0001, 0.0001),
+    # Error case: Invalid dimension values
+    ("YRDMT-6061-T6511-TB--1.0000--1.0000--1.0000", "ALUM EXTRUDED ROUND TUBE - BAR - 1-Aluminum Bar - 6061-T6511-TB - 6061-T6511-TB--1.0000--1.0000--1.0000", -1.0, -1.0, -1.0),
+    # NULL handling scenario
+    ("YRDMT-6061-T6511-TB-NULL-NULL-NULL", "ALUM EXTRUDED ROUND TUBE - BAR - 1-Aluminum Bar - 6061-T6511-TB - 6061-T6511-TB-NULL-NULL-NULL", None, None, None),
+    # Special characters and multi-byte characters
+    ("YRDMT-6061-T6511-TB-3.7500-3.7500-3.7500", "ALUM EXTRUDED ROUND TUBE - BAR - 1-Aluminum Bar - 6061-T6511-TB - 6061-T6511-TB-3.7500-3.7500-3.7500-特殊字符", 3.75, 3.75, 3.75)
 ]
 
-# Create DataFrame with test data
-df = spark.createDataFrame(data, schema=schema)
+# Create DataFrame
+df = spark.createDataFrame(data, schema)
 
-# Add current timestamp as "timestemp" column
-df = df.withColumn("timestemp", current_timestamp())
+# Extract product size from description or use product_id as fallback
+df = df.withColumn("product_size", 
+                   when(col("product_description").rlike(r"(\d+\.\d+-\d+\.\d+-\d+\.\d+)"), 
+                        col("product_description").substr(col("product_description").rlike(r"(\d+\.\d+-\d+\.\d+-\d+\.\d+)"), 0, 100))
+                   .otherwise(col("product_id").substr(col("product_id").rlike(r"(\d+\.\d+-\d+\.\d+-\d+\.\d+)"), 0, 100)))
 
-# Show the resulting DataFrame
+# Add timestamp column
+df = df.withColumn("timestamp", current_timestamp())
+
+# Show the DataFrame
 df.show(truncate=False)
 
-
-This code block defines a schema in accordance with the Databricks environment with necessary data types, constructs diverse test cases including happy paths, edge cases, and scenarios for error handling and special character inputs, and adds a "timestemp" column using the current timestamp functionality of PySpark.
