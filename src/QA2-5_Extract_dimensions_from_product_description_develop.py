@@ -1,48 +1,71 @@
+# Import necessary PySpark libraries
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType, TimestampType
 from pyspark.sql.functions import col, regexp_extract, when, current_timestamp
-from pyspark.sql.types import StringType
-from delta.tables import DeltaTable
+from pyspark.sql import DataFrame
 
-# Assuming input data is in Delta format and stored in 'purgo_playground.product_desc'
-input_table = "purgo_playground.product_desc"
+# Define the PySpark schema for "product_desc" table
+schema = StructType([
+    StructField("product_id", StringType(), True),
+    StructField("product_description", StringType(), True),
+    StructField("dimension_1", DoubleType(), True),
+    StructField("dimension_2", DoubleType(), True),
+    StructField("dimension_3", DoubleType(), True)
+])
 
-# Output table in Delta format
-output_table = "purgo_playground.product_desc"
-
-# Load the existing data from the Delta table
-df = spark.read.table(input_table)
-
-# Function to extract product size from product_description or product_id
-def extract_product_size(df):
-    # Define regular expression patterns for extracting product size
-    pattern_desc = r"(\d+\.\d+-\d+\.\d+-\d+\.\d+)"
-    pattern_id = r"(\d+\.\d+-\d+\.\d+-\d+\.\d+|\d+\.\d+)"
-
-    # Extract product size from description or fallback to product_id
+# Assume df is the dataframe read from "purgo_playground.product_desc"
+def extract_and_update_product_size(df: DataFrame) -> DataFrame:
+    """
+    Extracts product_size from product_description or falls back on product_id
+    and adds 'timestemp' column to the DataFrame.
+    
+    Parameters:
+    df (DataFrame): The input DataFrame with product_id and product_description.
+    
+    Returns:
+    DataFrame: Updated DataFrame with 'product_size' and 'timestemp' columns.
+    """
+    # Pattern for extracting size in 'x.x-x.x-x.x' or 'x.x' formats
+    size_pattern = r'(\d+\.\d+-\d+\.\d+-\d+\.\d+|\d+\.\d+)'
+    
+    # Extract product size using regex pattern
     df = df.withColumn(
         "product_size",
         when(
-            col("product_description").isNotNull() & 
-            (regexp_extract(col("product_description"), pattern_desc, 0) != ""),
-            regexp_extract(col("product_description"), pattern_desc, 0)
+            regexp_extract(col("product_description"), size_pattern, 0) != "",
+            regexp_extract(col("product_description"), size_pattern, 0)
         ).otherwise(
-            regexp_extract(col("product_id"), pattern_id, 0)
+            regexp_extract(col("product_id"), size_pattern, 0)
         )
-    ).withColumn("timestemp", current_timestamp())
-
+    )
+    
+    # Add current timestamp as 'timestemp'
+    df = df.withColumn("timestemp", current_timestamp())
+    
     return df
 
-# Apply the extraction logic
-processed_df = extract_product_size(df)
+# Invoke the function to process the data
+updated_df = extract_and_update_product_size(df)
 
-# Write the processed data back to Delta, ensuring schema compatibility and history
-processed_df.write.format("delta").mode("append").option("mergeSchema", "true").saveAsTable(output_table)
+# Write back the processed DataFrame to the Delta table
+updated_df.write.format("delta").mode("overwrite").saveAsTable("purgo_playground.product_desc")
 
-# Optimize the table for faster retrievals
-spark.sql(f"OPTIMIZE {output_table} ZORDER BY (product_size)")
+# Apply table optimization strategies:
+# Optimize the table by Z-ordering on 'product_size' for better performance on queries filtering by product size
+spark.sql("""
+    OPTIMIZE purgo_playground.product_desc
+    ZORDER BY (product_size)
+""")
 
-# Vacuum the table for space reduction
-spark.sql(f"VACUUM {output_table} RETAIN 0 HOURS")
+# Vacuum to remove old files and maintain the performance and storage efficiency
+spark.sql("""
+    VACUUM purgo_playground.product_desc RETAIN 168 HOURS
+""")
 
-# Display status message
-print("Product size extraction and table update complete.")
+# Ensure the Delta Lake table properties are set for data versioning and schema evolution
+spark.sql("""
+    ALTER TABLE purgo_playground.product_desc SET TBLPROPERTIES (
+        'delta.autoOptimize.optimizeWrite' = 'true',
+        'delta.autoOptimize.autoCompact' = 'true'
+    )
+""")
 
