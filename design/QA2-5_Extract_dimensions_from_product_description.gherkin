@@ -1,62 +1,45 @@
-Feature: Extract Product Size and Update Product Description with Timestamp
+Feature: Extract product size from product description and update database
 
   Background:
-    Given a database table named "purgo_playground.product_desc" with columns:
-      | product_id        | product_description                                                 | product_size           | dimension_1 | dimension_2 | dimension_3 |
-    And a target table named "purgo_playground.product_desc" for storing processed records
-    And a timestamp column "timestemp" defined with the format "YYYY-MM-DD HH:MM:SS"
+    Given the Unity Catalog Schema is "purgo_playground"
+    And the input file is "product_desc (1) (1).csv"
+    And the target table is "purgo_playground.d_product_revenue_bronze"
 
-  Scenario Outline: Extract and Validate Product Size From Product Description
-    Given a product record with product_id "<product_id>" and product_description "<product_description>"
-    When the system extracts the product size using the description
-    Then the extracted product size should be "<expected_size>"
-    And a validation message should confirm "Valid size extracted"
-    And the system updates the table with the new "timestemp"
+  Scenario: Extract product size from product description
+    Given a product description "ALUM EXTRUDED ROUND TUBE - BAR - 1-Aluminum Bar - 6061-T6511-TB - 6061-T6511-TB-3.7500-.3750-23.7000"
+    When the system extracts the product size
+    Then the extracted product size should be "3.7500-.3750-23.7000"
+    And the product size is saved in the database
 
-    Examples:
-      | product_id                           | product_description                                                                                   | expected_size         |
-      | YRDMT-6061-T6511-TB-3.7500-.3750-23.7000 | ALUM EXTRUDED ROUND TUBE - BAR - 1-Aluminum Bar - 6061-T6511-TB - 6061-T6511-TB-3.7500-.3750-23.7000 | 3.7500-.3750-23.7000 |
-
-  Scenario: Extraction Failure and Fallback to Product ID
-    Given a product record with product_id "YRDMT-7075-T73-TB-2.8750" and product_description "ALUMINUM EXTRUDED TUBING - BAR - 1-Aluminum Bar - 7075-T73-TB - 7075-T73-TB-2.8750"
+  Scenario: Extract product size using product ID as fallback
+    Given a product description "ALUMINUM EXTRUDED TUBING - BAR - 1-Aluminum Bar - 7075-T73-TB - 7075-T73-TB-2.8750"
+    And a product ID "YRDMT-7075-T73-TB-2.8750"
     When the system fails to extract the product size from the description
-    Then the system should fall back to the product_id pattern for size extraction
+    Then the system should use the product ID to extract the product size
     And the extracted product size should be "2.8750"
-    And update the table with the new "timestemp"
+    And the product size is saved in the database
 
-  Scenario Outline: Validate Data Format and Handle Errors
-    Given a product record with product_id "<product_id>" and product_description "<invalid_product_description>"
-    When an invalid product description is encountered during size extraction
-    Then the system should not produce a product size
-    And an error message "Extraction failed due to invalid format" should be logged
+  Scenario: Add timestamp column to the database
+    Given the target table is "purgo_playground.d_product_revenue_bronze"
+    When the system updates the table
+    Then a new column "timestamp" should be added
+    And the format of the timestamp should be "yyyy-MM-dd HH:mm:ss"
 
-    Examples:
-      | product_id | invalid_product_description                                                 |
-      | YRDMT-9999 | INVALID PRODUCT DESCRIPTION with no size info                               |
-
-  Scenario Outline: Handle Missing Product Size and Populate with Product ID
-    Given a product record with product_id "<product_id>" and product_description "<product_description>"
-    When the system detects a missing product_size field
-    Then it extracts size from the product_id
-    And populate the product_size with "<expected_size>"
-    And update the table with the new "timestemp"
+  Scenario Outline: Validate product size extraction logic
+    Given a product description "<product_description>"
+    And a product ID "<product_id>"
+    When the system extracts the product size
+    Then the extracted product size should be "<expected_product_size>"
+    And the product size is saved in the database
 
     Examples:
-      | product_id                           | product_description                                                | expected_size |
-      | YRDMT-6061-T6511-TB-4.5000-1.0000-104.1550 | ALUM EXTRUDED ROUND                                               | 4.5000-1.0000-104.1550 |
+      | product_description                                                                 | product_id                                | expected_product_size |
+      | "ALUM EXTRUDED ROUND TUBE - BAR - 1-Aluminum Bar - 6061-T6511-TB - 6061-T6511-TB-3.7500-.3750-23.7000" | "YRDMT-6061-T6511-TB-3.7500-.3750-23.7000" | "3.7500-.3750-23.7000" |
+      | "ALUMINUM EXTRUDED TUBING - BAR - 1-Aluminum Bar - 7075-T73-TB - 7075-T73-TB-2.8750" | "YRDMT-7075-T73-TB-2.8750"                 | "2.8750"               |
 
-  Scenario: Validate Integration with Existing Database Schema
-    Given a table structure in "purgo_playground.product_desc" with existing columns and newly added "timestemp"
-    When product_size is extracted from product_description successfully
-    Then ensure seamless integration without data conflicts
-    And ensure the new column adheres to schema constraints
-
-  Scenario Outline: Invalid Product Description Handling
-    Given a product record with an invalid product_description "<product_description>"
-    When the system attempts to extract product_size
-    Then it should log an error stating "Invalid format"
-    And the product_size should remain empty
-
-    Examples:
-      | product_description      |
-      | INVALID DESCRIPTION DATA |
+  Scenario: Error handling for missing product size
+    Given a product description "ALUMINUM EXTRUDED TUBING - BAR - 1-Aluminum Bar - 7075-T73-TB"
+    And a product ID "YRDMT-7075-T73-TB"
+    When the system fails to extract the product size from both description and ID
+    Then an error message "Product size extraction failed for product ID: YRDMT-7075-T73-TB" should be logged
+    And the process should continue with the next record
