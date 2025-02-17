@@ -1,9 +1,8 @@
-# Import necessary PySpark libraries
-from pyspark.sql.types import StructType, StructField, StringType, DoubleType, TimestampType
-from pyspark.sql.functions import col, regexp_extract, when, current_timestamp
-from pyspark.sql import DataFrame
+# Import necessary libraries
+from pyspark.sql.functions import col, when, current_timestamp, regexp_extract, lit
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 
-# Define the PySpark schema for "product_desc" table
+# Define the schema for the input data
 schema = StructType([
     StructField("product_id", StringType(), True),
     StructField("product_description", StringType(), True),
@@ -12,60 +11,56 @@ schema = StructType([
     StructField("dimension_3", DoubleType(), True)
 ])
 
-# Assume df is the dataframe read from "purgo_playground.product_desc"
-def extract_and_update_product_size(df: DataFrame) -> DataFrame:
-    """
-    Extracts product_size from product_description or falls back on product_id
-    and adds 'timestemp' column to the DataFrame.
-    
-    Parameters:
-    df (DataFrame): The input DataFrame with product_id and product_description.
-    
-    Returns:
-    DataFrame: Updated DataFrame with 'product_size' and 'timestemp' columns.
-    """
-    # Pattern for extracting size in 'x.x-x.x-x.x' or 'x.x' formats
-    size_pattern = r'(\d+\.\d+-\d+\.\d+-\d+\.\d+|\d+\.\d+)'
-    
-    # Extract product size using regex pattern
-    df = df.withColumn(
-        "product_size",
-        when(
-            regexp_extract(col("product_description"), size_pattern, 0) != "",
-            regexp_extract(col("product_description"), size_pattern, 0)
-        ).otherwise(
-            regexp_extract(col("product_id"), size_pattern, 0)
-        )
-    )
-    
-    # Add current timestamp as 'timestemp'
-    df = df.withColumn("timestemp", current_timestamp())
-    
-    return df
+# Load the data from the CSV file into a DataFrame
+df = spark.read.format("csv") \
+    .option("header", "true") \
+    .schema(schema) \
+    .load("/path/to/product_desc (1) (1).csv")
 
-# Invoke the function to process the data
-updated_df = extract_and_update_product_size(df)
+# Extract product size from description or use product_id as fallback
+df = df.withColumn("product_size", 
+                   when(col("product_description").rlike(r"(\d+\.\d+-\d+\.\d+-\d+\.\d+)"), 
+                        regexp_extract(col("product_description"), r"(\d+\.\d+-\d+\.\d+-\d+\.\d+)", 0))
+                   .otherwise(regexp_extract(col("product_id"), r"(\d+\.\d+-\d+\.\d+-\d+\.\d+)", 0)))
 
-# Write back the processed DataFrame to the Delta table
-updated_df.write.format("delta").mode("overwrite").saveAsTable("purgo_playground.product_desc")
+# Add timestamp column
+df = df.withColumn("timestamp", current_timestamp())
 
-# Apply table optimization strategies:
-# Optimize the table by Z-ordering on 'product_size' for better performance on queries filtering by product size
+# Handle missing product size and log errors
+df = df.withColumn("product_size", 
+                   when(col("product_size") == "", lit(None).cast(StringType()))
+                   .otherwise(col("product_size")))
+
+# Log errors for missing product size
+df.filter(col("product_size").isNull()).select("product_id").foreach(lambda row: print(f"Product size extraction failed for product ID: {row['product_id']}"))
+
+# Write the DataFrame to a Delta table
+df.write.format("delta") \
+    .mode("overwrite") \
+    .option("overwriteSchema", "true") \
+    .saveAsTable("purgo_playground.d_product_revenue_bronze")
+
+# Optimize the Delta table
+spark.sql("OPTIMIZE purgo_playground.d_product_revenue_bronze ZORDER BY (product_size)")
+
+# Vacuum the Delta table to remove old files
+spark.sql("VACUUM purgo_playground.d_product_revenue_bronze RETAIN 0 HOURS")
+
+# SQL code to create the Delta table with appropriate schema
 spark.sql("""
-    OPTIMIZE purgo_playground.product_desc
-    ZORDER BY (product_size)
+CREATE TABLE IF NOT EXISTS purgo_playground.d_product_revenue_bronze (
+    product_id STRING,
+    product_description STRING,
+    dimension_1 DOUBLE,
+    dimension_2 DOUBLE,
+    dimension_3 DOUBLE,
+    product_size STRING,
+    timestamp TIMESTAMP
+)
+USING DELTA
+PARTITIONED BY (product_size)
+TBLPROPERTIES (
+    'delta.autoOptimize.optimizeWrite' = 'true',
+    'delta.autoOptimize.autoCompact' = 'true'
+)
 """)
-
-# Vacuum to remove old files and maintain the performance and storage efficiency
-spark.sql("""
-    VACUUM purgo_playground.product_desc RETAIN 168 HOURS
-""")
-
-# Ensure the Delta Lake table properties are set for data versioning and schema evolution
-spark.sql("""
-    ALTER TABLE purgo_playground.product_desc SET TBLPROPERTIES (
-        'delta.autoOptimize.optimizeWrite' = 'true',
-        'delta.autoOptimize.autoCompact' = 'true'
-    )
-""")
-
