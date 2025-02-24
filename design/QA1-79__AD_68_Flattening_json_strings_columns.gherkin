@@ -1,0 +1,82 @@
+Feature: Extract fields from JSON in product_details column
+
+  Background:
+    Given the table name `purgo_playground.d_product_revenue`
+    And a JSON structure is stored in the `product_details` column
+    And the following keys need to be extracted:
+      | batch_number       |
+      | expiration_date    |
+      | manufacturing_site |
+      | regulatory_approval|
+      | price              |
+
+  Scenario: Happy path - Extract all fields from JSON
+    Given a well-formed JSON in `product_details` column
+    When the query is executed
+    Then the output should contain the following columns:
+      | batch_number       |
+      | expiration_date    |
+      | manufacturing_site |
+      | regulatory_approval|
+      | price              |
+    And each field should be extracted correctly with the correct data types
+      | batch_number       | string  |
+      | expiration_date    | date    |
+      | manufacturing_site | string  |
+      | regulatory_approval| string  |
+      | price              | decimal |
+
+  Scenario: Error path - Handle invalid JSON
+    Given a malformed JSON in `product_details` column
+    When the query is executed
+    Then an error message "Invalid JSON format in product_details" should be returned
+
+  Scenario Outline: Data-driven test for extracting fields
+    Given JSON structure in `product_details` is:
+      """
+      {
+        "batch_number": "<batchNumber>",
+        "expiration_date": "<expirationDate>",
+        "manufacturing_site": "<manufacturingSite>",
+        "regulatory_approval": "<regulatoryApproval>",
+        "price": <price>
+      }
+      """
+    When the query is executed
+    Then the extracted fields should match:
+      | extracted_batch_number | extracted_expiration_date | extracted_manufacturing_site | extracted_regulatory_approval | extracted_price |
+      | <batchNumber>         | <expirationDate>          | <manufacturingSite>          | <regulatoryApproval>          | <price>         |
+
+    Examples:
+      | batchNumber   | expirationDate | manufacturingSite | regulatoryApproval | price  |
+      | BATCH2024-5678| 2025-12-31     | Site A            | Approved           | 250.75 |
+      | BATCH1234-5678| 2023-08-15     | Site B            | Pending            | 150.50 |
+
+  Scenario: Performance scenario - Ensure query optimization
+    Given a large dataset in the `d_product_revenue` table
+    When the query is executed
+    Then the query should complete within an acceptable time
+    And there should be no performance degradation
+
+  Technical Details:
+    Query:
+    """
+    SELECT 
+      product_id,
+      product_name,
+      product_type,
+      revenue,
+      country,
+      customer_id,
+      purchased_date,
+      invoice_date,
+      invoice_number,
+      is_returned,
+      customer_satisfaction_score,
+      customer_first_purchased_date,
+      customer_first_product,
+      customer_first_revenue,
+      from_json(product_details, 'struct<batch_number:string, expiration_date:string, manufacturing_site:string, regulatory_approval:string, price:double>') as product_details_json
+    FROM 
+      purgo_playground.d_product_revenue
+    """
