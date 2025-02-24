@@ -1,35 +1,19 @@
 /* 
-   SQL query to extract fields from the JSON column 'product_details' 
-   in the 'purgo_playground.d_product_revenue' table
+  SQL query to extract fields from JSON string stored in the 
+  `product_details` column of `purgo_playground.d_product_revenue` table 
 */
 
 /**
- * Description: This query extracts specific fields from the JSON string stored in the 
- * `product_details` column of `purgo_playground.d_product_revenue` table. Each JSON field is 
- * extracted and aliased for clarity, ensuring correct data types as well.
+ * This query extracts specific fields from the JSON structure stored in the 
+ * `product_details` column. Each JSON field is extracted with the specified 
+ * data types and aliases to ensure clarity in the output.
  */
+
 SELECT 
-  product_id,
-  product_name,
-  product_type,
-  revenue,
-  country,
-  customer_id,
-  purchased_date,
-  invoice_date,
-  invoice_number,
-  is_returned,
-  customer_satisfaction_score,
-  customer_first_purchased_date,
-  customer_first_product,
-  customer_first_revenue,
+  -- Extract JSON fields into individual columns for clarity and analysis
+  from_json(product_details, 'struct<batch_number:string, expiration_date:string, manufacturing_site:string, regulatory_approval:string, price:double>') AS product_details_json,
   
-  -- Extracting each field from the JSON and aliasing them with user-friendly names
-  from_json(product_details, 
-    'struct<batch_number:string, expiration_date:string, manufacturing_site:string, regulatory_approval:string, price:double>'
-  ) AS product_details_json,
-  
-  -- Extract JSON fields into individual columns
+  -- Extracting and aliasing each field for user-friendly column names
   product_details_json.batch_number AS batch_number,
   product_details_json.expiration_date AS expiration_date,
   product_details_json.manufacturing_site AS manufacturing_site,
@@ -40,9 +24,9 @@ FROM
   purgo_playground.d_product_revenue
 
 WHERE 
-  -- Check for valid expiration_date by ensuring it follows the expected date format
+  -- Data quality check: Validate the date format in the `expiration_date`
   try_to_date(product_details_json.expiration_date, 'yyyy-MM-dd') IS NOT NULL
-
-  -- Null handling: If product_details is NULL, ensure it's excluded from results
-  OR product_details IS NULL;
+ 
+  -- Null handling: Exclude entries with NULL `product_details`
+  AND product_details IS NOT NULL;
 
