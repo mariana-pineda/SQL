@@ -2,11 +2,11 @@
 
 SELECT 
   -- Extract each attribute from the JSON string and handle potential missing attributes
-  COALESCE(get_json_object(product_details, "$.batch_number"), "Unknown") AS batch_number,
-  COALESCE(get_json_object(product_details, "$.expiration_date"), "Unknown") AS expiration_date,
-  COALESCE(get_json_object(product_details, "$.manufacturing_site"), "Unavailable") AS manufacturing_site,
-  COALESCE(get_json_object(product_details, "$.regulatory_approval"), "Pending") AS regulatory_approval,
-  COALESCE(CAST(get_json_object(product_details, "$.price") AS DOUBLE), 0.0) AS price
+  COALESCE(get_json_object(product_details, '$.batch_number'), "Unknown") AS batch_number,
+  COALESCE(get_json_object(product_details, '$.expiration_date'), "Unknown") AS expiration_date,
+  COALESCE(get_json_object(product_details, '$.manufacturing_site'), "Unavailable") AS manufacturing_site,
+  COALESCE(get_json_object(product_details, '$.regulatory_approval'), "Pending") AS regulatory_approval,
+  COALESCE(CAST(get_json_object(product_details, '$.price') AS DOUBLE), 0.0) AS price
 FROM 
   -- Specify the fully qualified table name in Unity Catalog
   purgo_playground.d_product_revenue;
