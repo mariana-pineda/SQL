@@ -1,4 +1,4 @@
--- Corrected SQL code to select fields from the product_details JSON column in the d_product_revenue table in the purgo_playground catalog
+-- SQL code to select fields from the product_details JSON column in the d_product_revenue table in the purgo_playground catalog
 
 SELECT 
   -- Extract each attribute from the JSON string and handle potential missing attributes
