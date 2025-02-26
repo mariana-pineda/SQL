@@ -1,0 +1,64 @@
+Feature: Rank Product Performance by Revenue
+  To increase revenue, we need to identify top-performing products by ranking them by revenue across different countries using a 12-month dataset.
+
+  Background:
+    Given the Unity Catalog as purgo_playground
+    And the Unity Catalog Schema as information_schema
+    And the table d_product_revenue exists in the schema
+
+  Scenario: Capture product performance for Gold category
+    Given the product type is specified as "ProductType"
+    And the purchase date is the "PurchasedDate" column
+    And we have a dataframe with revenue data over 12 months
+    When the product is ranked among the top 3 for 6 or more months
+    Then set the performance of "ProductType" to "Gold"
+
+  Scenario: Capture product performance for Silver category
+    Given the product type is specified as "ProductType"
+    And the purchase date is the "PurchasedDate" column
+    And we have a dataframe with revenue data over 12 months
+    When the product is ranked among the top 3 for 3 to 5 months
+    Then set the performance of "ProductType" to "Silver"
+
+  Scenario: Capture product performance for Bronze category
+    Given the product type is specified as "ProductType"
+    And the purchase date is the "PurchasedDate" column
+    And we have a dataframe with revenue data over 12 months
+    When the product is ranked among the top 3 for less than 3 months
+    Then set the performance of "ProductType" to "Bronze"
+
+  Scenario: Error handling for missing product type
+    Given the product type column is missing in the dataset
+    When the process is executed
+    Then an error occurs with message "Product type is required for ranking"
+
+  Scenario: Error handling for incorrect purchased date format
+    Given the purchased date column format is incorrect
+    When the process is executed
+    Then an error occurs with message "PurchasedDate should be in YYYY-MM-DD format"
+
+  Scenario Outline: Validate product ranking by country
+    Given the country is "<Country>"
+    And the product type is "ProductType"
+    When the dataframe is filtered by "<Country>"
+    Then the rankings are adjusted correctly for "<Country>"
+
+    Examples:
+      | Country     |
+      | USA         |
+      | Canada      |
+      | Germany     |
+      | Australia   |
+      | Japan       |
+
+  Scenario Outline: Validate performance assignment over different months
+    Given the <ProductType> has ranked in the top 3 for <Months> months
+    When evaluating performance status
+    Then the result should be "<Performance>"
+
+    Examples:
+      | ProductType | Months | Performance |
+      | A           | 6      | Gold        |
+      | B           | 4      | Silver      |
+      | C           | 2      | Bronze      |
+      | D           | 8      | Gold        |
