@@ -1,64 +1,38 @@
-Feature: Rank Product Performance by Revenue
-  To increase revenue, we need to identify top-performing products by ranking them by revenue across different countries using a 12-month dataset.
+Feature: Rank Products by Revenue and Evaluate Performance Consistency
 
   Background:
-    Given the Unity Catalog as purgo_playground
-    And the Unity Catalog Schema as information_schema
-    And the table d_product_revenue exists in the schema
+    Given the data is available in Unity Catalog at "purgo_playground.information_schema"
+    And the dataset includes columns "product_type" and "purchased_date"
 
-  Scenario: Capture product performance for Gold category
-    Given the product type is specified as "ProductType"
-    And the purchase date is the "PurchasedDate" column
-    And we have a dataframe with revenue data over 12 months
-    When the product is ranked among the top 3 for 6 or more months
-    Then set the performance of "ProductType" to "Gold"
+  Scenario Outline: Rank products by revenue for each country
+    Given a dataset with product sales data spanning 12 months
+    When I calculate total revenue for each <product_type> per country from <start_date> to <end_date>
+    Then I rank products by revenue in descending order for each country
 
-  Scenario: Capture product performance for Silver category
-    Given the product type is specified as "ProductType"
-    And the purchase date is the "PurchasedDate" column
-    And we have a dataframe with revenue data over 12 months
-    When the product is ranked among the top 3 for 3 to 5 months
-    Then set the performance of "ProductType" to "Silver"
+  Examples:
+    | product_type | start_date | end_date   |
+    | Electronics  | 2022-01-01 | 2022-12-31 |
+    | Clothing     | 2022-01-01 | 2022-12-31 |
 
-  Scenario: Capture product performance for Bronze category
-    Given the product type is specified as "ProductType"
-    And the purchase date is the "PurchasedDate" column
-    And we have a dataframe with revenue data over 12 months
-    When the product is ranked among the top 3 for less than 3 months
-    Then set the performance of "ProductType" to "Bronze"
+  Scenario Outline: Add performance column based on consistency criteria
+    Given a ranked list of <product_type> for each month
+    When I evaluate the number of months each product is in the top 3 rankings
+    Then I classify <product_type> as Gold if ranked top 3 for >=6 months, Silver if >=3 and <6 months, Bronze if <3 months
+    And I add this classification to a new column called "performance"
 
-  Scenario: Error handling for missing product type
-    Given the product type column is missing in the dataset
-    When the process is executed
-    Then an error occurs with message "Product type is required for ranking"
+  Examples:
+    | product_type |
+    | Electronics  |
+    | Clothing     |
 
-  Scenario: Error handling for incorrect purchased date format
-    Given the purchased date column format is incorrect
-    When the process is executed
-    Then an error occurs with message "PurchasedDate should be in YYYY-MM-DD format"
+  Scenario: Handle ties in rankings
+    Given multiple products have identical revenues within a month for a specific country
+    When calculating monthly ranks
+    Then assign them equal rank positions without skipping subsequent ranks
 
-  Scenario Outline: Validate product ranking by country
-    Given the country is "<Country>"
-    And the product type is "ProductType"
-    When the dataframe is filtered by "<Country>"
-    Then the rankings are adjusted correctly for "<Country>"
+  Scenario: Periodic recalculation of rankings based on new data
+    Given new purchase data is added after initial ranking calculation 
+    When recalculating rankings 
+    Then update ranks and performance classifications based on latest complete set of data
 
-    Examples:
-      | Country     |
-      | USA         |
-      | Canada      |
-      | Germany     |
-      | Australia   |
-      | Japan       |
 
-  Scenario Outline: Validate performance assignment over different months
-    Given the <ProductType> has ranked in the top 3 for <Months> months
-    When evaluating performance status
-    Then the result should be "<Performance>"
-
-    Examples:
-      | ProductType | Months | Performance |
-      | A           | 6      | Gold        |
-      | B           | 4      | Silver      |
-      | C           | 2      | Bronze      |
-      | D           | 8      | Gold        |
