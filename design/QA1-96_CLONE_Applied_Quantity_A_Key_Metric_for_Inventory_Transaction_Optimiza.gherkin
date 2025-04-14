@@ -1,45 +1,50 @@
-Feature: Calculate Applied Quantity (apl_qty) for Inventory Transactions
+Feature: Calculate Applied Quantity (apl_qty) in Inventory Transactions
 
   Background:
-    Given a digital supply chain environment in the Life Sciences sector
-    And the Unity Catalog schema as purgo_playground
+    Given a database connection to Unity Catalog purgo_databricks
+    And a schema named purgo_playground
+    And loaded data from Inventory_Txn_Applied_Qty.xlsx for txn_id, ref_txn_qty, cumulative_txn_qty, cumulative_ref_ord_sched_qty, ref_ord_sched_qty, prior_cumulative_txn_qty, prior_cumulative_ref_ord_sched_qty
 
-  Scenario Outline: Calculate apl_qty for positive transaction quantities
-    Given ref_txn_qty is greater than <ref_txn_qty_value> and cumulative_txn_qty is greater than or equal to cumulative_ref_ord_sched_qty
-    When prior_cumulative_ref_ord_sched_qty is less than prior_cumulative_txn_qty
-    Then apl_qty should be calculated as ref_ord_sched_qty minus the difference between prior_cumulative_txn_qty and prior_cumulative_ref_ord_sched_qty
-
-    Examples:
-      | txn_id | ref_txn_qty_value | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty | expected_apl_qty |
-      | 1      | 0                 | 100                | 90                          | 50               | 40                       | 30                                 | 40               |
-
-  Scenario: Calculate apl_qty using ref_ord_sched_qty as fallback
-    Given ref_txn_qty is greater than 0 and cumulative_txn_qty is greater than or equal to cumulative_ref_ord_sched_qty
-    When prior_cumulative_ref_ord_sched_qty is not less than prior_cumulative_txn_qty
-    Then apl_qty should be set to ref_ord_sched_qty
-
-  Scenario Outline: Calculate apl_qty for positive ref_txn_qty with cumulative_ref_ord_sched_qty condition
-    Given ref_txn_qty is greater than <ref_txn_qty_value> and cumulative_ref_ord_sched_qty is greater than or equal to cumulative_txn_qty
-    When prior_cumulative_ref_ord_sched_qty is greater than prior_cumulative_txn_qty
-    Then apl_qty should be computed as ref_txn_qty minus the difference between prior_cumulative_ref_ord_sched_qty and prior_cumulative_txn_qty
+  Scenario Outline: Calculate apl_qty for positive ref_txn_qty with cumulative_txn_qty >= cumulative_ref_ord_sched_qty
+    Given ref_txn_qty is > 0
+    And cumulative_txn_qty is >= cumulative_ref_ord_sched_qty
+    When prior_cumulative_ref_ord_sched_qty is < prior_cumulative_txn_qty
+    Then set apl_qty to <calculated_apl_qty>
+    Else set apl_qty to ref_ord_sched_qty
+    And insert into purgo_playground.f_inv_movmnt_apl_qty (txn_id, apl_qty)
 
     Examples:
-      | txn_id | ref_txn_qty_value | cumulative_txn_qty | cumulative_ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty | expected_apl_qty |
-      | 3      | 0                 | 60                 | 100                         | 30                       | 25                                 | 15               |
+      | txn_id | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty | calculated_apl_qty |
+      | 1      | 50          | 100                | 90                           | 50               | 40                       | 30                                  | 40.0               |
 
-  Scenario: Calculate apl_qty using ref_txn_qty as fallback
-    Given ref_txn_qty is greater than 0 and cumulative_ref_ord_sched_qty is greater than or equal to cumulative_txn_qty
-    When prior_cumulative_ref_ord_sched_qty is not greater than prior_cumulative_txn_qty
-    Then apl_qty should be set to ref_txn_qty
-
-  Scenario Outline: Calculate apl_qty for negative ref_txn_qty consistency
-    Given ref_txn_qty is less than 0, cumulative_txn_qty is not equal to 0, and cumulative_ref_ord_sched_qty is greater than 0
-    Then apl_qty should be set directly to ref_txn_qty
+  Scenario Outline: Calculate apl_qty for positive ref_txn_qty with cumulative_ref_ord_sched_qty >= cumulative_txn_qty
+    Given ref_txn_qty is > 0
+    And cumulative_ref_ord_sched_qty is >= cumulative_txn_qty
+    When prior_cumulative_ref_ord_sched_qty is > prior_cumulative_txn_qty
+    Then set apl_qty to <calculated_apl_qty>
+    Else set apl_qty to ref_txn_qty
+    And insert into purgo_playground.f_inv_movmnt_apl_qty (txn_id, apl_qty)
 
     Examples:
-      | txn_id | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | expected_apl_qty |
-      | 2      | -10         | 80                 | 70                          | -10              |
+      | txn_id | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty | calculated_apl_qty |
+      | 3      | 20          | 60                 | 100                          | 30                | 30                       | 25                                  | 20.0               |
 
-  Scenario: Handle default scenario result as NULL
-    Given all specified conditions are not met
-    Then apl_qty should be set to NULL
+  Scenario Outline: Calculate apl_qty for negative ref_txn_qty where cumulative_txn_qty != 0 and cumulative_ref_ord_sched_qty > 0
+    Given ref_txn_qty is < 0
+    And cumulative_txn_qty is not equal to 0
+    And cumulative_ref_ord_sched_qty is > 0
+    Then set apl_qty to ref_txn_qty
+    And insert into purgo_playground.f_inv_movmnt_apl_qty (txn_id, apl_qty)
+
+    Examples:
+      | txn_id | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty | apl_qty |
+      | 2      | -10         | 80                 | 70                           | 40                | 50                       | 45                                  | -10.0   |
+
+  Scenario Outline: Default case for apl_qty calculation
+    Given none of the conditions are met
+    Then set apl_qty to NULL
+    And insert into purgo_playground.f_inv_movmnt_apl_qty (txn_id, apl_qty)
+
+    Examples:
+      | txn_id | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty |
+
