@@ -1,0 +1,60 @@
+Feature: SQL-based logic for f_invntry_bal_dly_hist table
+
+  Background:
+    Given the Unity Catalog information is available
+    And the schema is purgo_playground
+    And the target table is f_invntry_bal_dly_hist
+
+  Scenario Outline: Validate field mappings
+    Given source-to-target mapping is defined in the data_map sheet
+    When the mapping specifies <Source Column Name> from <Source Table Name>
+    Then it should map to <Target Column Name> in f_invntry_bal_dly_hist
+    And the datatype should convert from <Source Datatype> to <Target Datatype>
+    And any logic specified as <Logic> should be applied
+
+    Examples:
+      | Source Table Name | Source Column Name | Source Datatype | Target Column Name | Target Datatype | Logic                  |
+      | source_table_1    | src_col_1          | varchar         | target_col_1       | string          | UPPER(src_col_1)       |
+      | source_table_2    | src_col_2          | int             | target_col_2       | bigint          |                       |
+
+  Scenario: Successful data retrieval with filters
+    Given data is sourced from purgo_playground.purgo_playground.d_product_hist
+    When the filter 'flag_active = true' is applied
+    Then only records with flag_active set to 1 are retrieved
+
+  Scenario: Ensure proper join conditions
+    Given tables from the Source sheet require joining
+    When the join type specified is INNER JOIN
+    And joining conditions are defined in the Joins sheet as "table1.id = table2.fk_id"
+    Then ensure the SQL query concatenates this join accurately
+
+  Scenario: Validate error condition for missing data
+    Given a source column <missing_column> is not found in source data
+    When attempting to map this column
+    Then an error message "Column <missing_column> not found in source" should be produced
+
+    Examples:
+      | missing_column |
+      | src_col_missing |
+
+  Scenario: Error handling for datatype mismatch
+    Given a mapping specifies datatype conversion from int to date
+    When the source data is not compatible
+    Then an error message "Datatype mismatch for column <int_column> expected DATE" is generated
+
+    Examples:
+      | int_column |
+      | int_col_1  |
+
+  Scenario: Data-driven test for various input scenarios
+    Given the data mappings are defined correctly
+    When various scenarios are tested
+    Then ensure correct target data population for each scenario
+    And verify no unexpected errors occur
+
+    Examples:
+      | scenario                  | input_value | expected_result               |
+      | Missing mandatory field   | NULL        | "Mandatory field missing"     |
+      | Incorrect date format     | 20201332    | "Invalid date format"         |
+      | Correct data entry        | 20230101    | "Data populated successfully" |
+
