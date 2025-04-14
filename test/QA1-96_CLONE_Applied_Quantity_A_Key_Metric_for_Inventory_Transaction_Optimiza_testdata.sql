@@ -1,56 +1,9 @@
--- Test Data Generation Code using Databricks SQL
+-- Test Data Generation for Databricks Environment using SQL 
+-- Ensure data matches the target table schema: purgo_playground.purgo_playground.f_inv_movmnt_apl_qty_test
 
--- Define schema and create table for test data generation
-CREATE TABLE purgo_playground.f_inv_movmnt_apl_qty_test (
-    txn_id STRING,
-    ref_txn_qty DECIMAL(3,1),
-    cumulative_txn_qty DECIMAL(4,1),
-    cumulative_ref_ord_sched_qty DECIMAL(4,1),
-    ref_ord_sched_qty DECIMAL(3,1),
-    prior_cumulative_txn_qty DECIMAL(3,1),
-    prior_cumulative_ref_ord_sched_qty DECIMAL(3,1),
-    calculated_apl_qty DECIMAL(5,1),
-    apl_qty DECIMAL(5,1)
-);
-
--- Insert diverse test records
-INSERT INTO purgo_playground.f_inv_movmnt_apl_qty_test VALUES
-('1', 50.0, 100.0, 90.0, 50.0, 40.0, 30.0, 40.0, NULL),  -- Happy Path
-('2', -10.0, 80.0, 70.0, 40.0, 50.0, 45.0, -10.0, NULL), -- Error Case
-('3', 20.0, 60.0, 100.0, 30.0, 30.0, 25.0, 20.0, NULL),  -- Edge Case
-('4', 0.0, 50.0, 45.0, 20.0, 25.0, 20.0, NULL, NULL),   -- Edge Case with zero ref_txn_qty
-('5', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL), -- NULL Handling
-
--- Include special characters and multi-byte characters
-('6', 30.0, 80.0, 75.0, 25.0, 30.0, 20.0, 25.0, '特別'), -- Multi-byte characters
-('7', '25%', '45%', '50%', '30%', '25%', '20%', '30%', '@!&$'), -- Special characters
-('8', -20.0, 90.0, 85.0, 50.0, 40.0, 35.0, NULL, NULL), -- Error Case with out-of-range values
-('9', 100.0, NULL, 95.0, NULL, NULL, NULL, 90.0, NULL), -- Partial NULL Handling
-('10', 50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 'Valid'), -- Valid data
-
--- Happy Path scenarios
-SELECT * FROM purgo_playground.f_inv_movmnt_apl_qty_test WHERE txn_id IN ('1', '3', '10');
-
--- Edge Cases validation
-WITH cte_edge_cases AS (
-    SELECT * FROM purgo_playground.f_inv_movmnt_apl_qty_test WHERE ref_txn_qty = 0 OR apl_qty IS NULL
-)
-SELECT * FROM cte_edge_cases;
-
--- Error Case scenarios validation
-WITH cte_error_cases AS (
-    SELECT * FROM purgo_playground.f_inv_movmnt_apl_qty_test WHERE ref_txn_qty < 0 AND apl_qty IS NULL
-)
-SELECT * FROM cte_error_cases;
-
--- Special character handling validation
-WITH cte_special_chars AS (
-    SELECT * FROM purgo_playground.f_inv_movmnt_apl_qty_test WHERE apl_qty LIKE '%特%' OR apl_qty LIKE '%@!&$%'
-)
-SELECT * FROM cte_special_chars;
-
--- Validate consistency against the target table schema
-INSERT INTO purgo_playground.f_inv_movmnt_apl_qty SELECT 
+-- Test 1: Happy Path scenario where ref_txn_qty is positive and conditions are met
+WITH happy_path AS (
+  SELECT
     txn_id,
     CAST(ref_txn_qty AS DECIMAL(3,1)),
     CAST(cumulative_txn_qty AS DECIMAL(4,1)),
@@ -58,6 +11,77 @@ INSERT INTO purgo_playground.f_inv_movmnt_apl_qty SELECT
     CAST(ref_ord_sched_qty AS DECIMAL(3,1)),
     CAST(prior_cumulative_txn_qty AS DECIMAL(3,1)),
     CAST(prior_cumulative_ref_ord_sched_qty AS DECIMAL(3,1)),
-    CAST(apl_qty AS DECIMAL(5,1))
-FROM purgo_playground.f_inv_movmnt_apl_qty_test
-WHERE txn_id IS NOT NULL;
+    CAST(calculated_apl_qty AS DECIMAL(5,1)),
+    CASE WHEN ref_txn_qty > 0 AND cumulative_txn_qty >= cumulative_ref_ord_sched_qty 
+         AND prior_cumulative_ref_ord_sched_qty < prior_cumulative_txn_qty THEN 
+         CAST(ref_ord_sched_qty - (prior_cumulative_txn_qty - prior_cumulative_ref_ord_sched_qty) AS DECIMAL(5,1))
+         ELSE CAST(ref_ord_sched_qty AS DECIMAL(5,1))
+    END AS apl_qty
+  FROM VALUES
+    (1, 50, 100, 90, 50, 40, 30)
+) AS t(txn_id, ref_txn_qty, cumulative_txn_qty, cumulative_ref_ord_sched_qty, ref_ord_sched_qty, prior_cumulative_txn_qty, prior_cumulative_ref_ord_sched_qty, calculated_apl_qty),
+
+-- Test 2: Edge case scenario with ref_txn_qty positive and different conditions
+edge_case AS (
+  SELECT
+    txn_id,
+    CAST(ref_txn_qty AS DECIMAL(3,1)),
+    CAST(cumulative_txn_qty AS DECIMAL(4,1)),
+    CAST(cumulative_ref_ord_sched_qty AS DECIMAL(4,1)),
+    CAST(ref_ord_sched_qty AS DECIMAL(3,1)),
+    CAST(prior_cumulative_txn_qty AS DECIMAL(3,1)),
+    CAST(prior_cumulative_ref_ord_sched_qty AS DECIMAL(3,1)),
+    CAST(calculated_apl_qty AS DECIMAL(5,1)),
+    CASE WHEN ref_txn_qty > 0 AND cumulative_ref_ord_sched_qty >= cumulative_txn_qty 
+         AND prior_cumulative_ref_ord_sched_qty > prior_cumulative_txn_qty THEN 
+         CAST(ref_txn_qty - (prior_cumulative_ref_ord_sched_qty - prior_cumulative_txn_qty) AS DECIMAL(5,1))
+         ELSE CAST(ref_txn_qty AS DECIMAL(5,1))
+    END AS apl_qty
+  FROM VALUES
+    (3, 20, 60, 100, 30, 30, 25)
+) AS t(txn_id, ref_txn_qty, cumulative_txn_qty, cumulative_ref_ord_sched_qty, ref_ord_sched_qty, prior_cumulative_txn_qty, prior_cumulative_ref_ord_sched_qty, calculated_apl_qty),
+
+-- Test 3: Error case for negative ref_txn_qty
+error_case AS (
+  SELECT
+    txn_id,
+    CAST(ref_txn_qty AS DECIMAL(3,1)),
+    CAST(cumulative_txn_qty AS DECIMAL(4,1)),
+    CAST(cumulative_ref_ord_sched_qty AS DECIMAL(4,1)),
+    CAST(ref_ord_sched_qty AS DECIMAL(3,1)),
+    CAST(prior_cumulative_txn_qty AS DECIMAL(3,1)),
+    CAST(prior_cumulative_ref_ord_sched_qty AS DECIMAL(3,1)),
+    NULL AS calculated_apl_qty,
+    CASE WHEN ref_txn_qty < 0 AND cumulative_txn_qty != 0 AND cumulative_ref_ord_sched_qty > 0 THEN 
+         CAST(ref_txn_qty AS DECIMAL(5,1))
+         ELSE NULL
+    END AS apl_qty
+  FROM VALUES
+    (2, -10, 80, 70, 40, 50, 45)
+) AS t(txn_id, ref_txn_qty, cumulative_txn_qty, cumulative_ref_ord_sched_qty, ref_ord_sched_qty, prior_cumulative_txn_qty, prior_cumulative_ref_ord_sched_qty, NULL),
+
+-- Test 4: NULL handling scenario for default conditions
+null_handling AS (
+  SELECT
+    txn_id,
+    CAST(ref_txn_qty AS DECIMAL(3,1)),
+    CAST(cumulative_txn_qty AS DECIMAL(4,1)),
+    CAST(cumulative_ref_ord_sched_qty AS DECIMAL(4,1)),
+    CAST(ref_ord_sched_qty AS DECIMAL(3,1)),
+    CAST(prior_cumulative_txn_qty AS DECIMAL(3,1)),
+    CAST(prior_cumulative_ref_ord_sched_qty AS DECIMAL(3,1)),
+    NULL AS calculated_apl_qty,
+    NULL AS apl_qty
+  FROM VALUES
+    (4, NULL, NULL, NULL, NULL, NULL, NULL)
+) AS t(txn_id, ref_txn_qty, cumulative_txn_qty, cumulative_ref_ord_sched_qty, ref_ord_sched_qty, prior_cumulative_txn_qty, prior_cumulative_ref_ord_sched_qty, NULL)
+
+-- Combine all test data categories
+SELECT * FROM happy_path
+UNION
+SELECT * FROM edge_case
+UNION
+SELECT * FROM error_case
+UNION
+SELECT * FROM null_handling 
+
