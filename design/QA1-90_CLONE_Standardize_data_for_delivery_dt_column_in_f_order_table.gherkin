@@ -1,0 +1,46 @@
+Feature: Data Standardization for delivery_dt in f_order Table
+
+  Background:
+    Given the f_order table is located at /Workspace/stg/scripts/f_order.sql
+    And the table resides in Unity Catalog schema purgo_playground
+
+  Scenario: Validate delivery_dt format and datatype
+    Given the f_order table with delivery_dt column
+    When the SQL logic is applied to convert delivery_dt values
+    Then all delivery_dt values should be in Decimal(38,0) format
+    And all values should follow the yyyymmdd date structure
+
+  Scenario: Handling non-compliant delivery_dt records
+    Given the f_order table with potential non-compliant delivery_dt values
+    When the SQL query identifies records not matching Decimal(38,0) or yyyymmdd
+    Then an error message "Invalid delivery_dt format" will be logged
+    And the non-compliant records will be flagged for review
+
+  Scenario Outline: Validate delivery_dt with various data inputs
+    Given a record in f_order table with delivery_dt value '<date_value>'
+    When the SQL check is executed
+    Then the result should be '<expected_result>'
+  
+    Examples:
+      | date_value | expected_result       |
+      | 20240910   | Valid                 |
+      | 20249300   | Invalid delivery_dt format |
+      | ABCD1234   | Invalid delivery_dt format |
+
+  Scenario: SQL Logic fails due to upstream dependency
+    Given there is a dependency on the supply_chain_delivery table
+    When the upstream table fails to provide necessary data
+    Then the error "Upstream dependency failure" is triggered
+    And the process will pause until resolved
+
+  Scenario: Integration with engineering workflow
+    Given the data standardization process is part of a larger workflow
+    When the SQL script executes successfully
+    Then the standardized data is passed to the next data engineering stage
+    And successful execution is logged with timestamp
+
+  Scenario: Logging and auditing of data standardization
+    Given the SQL logic is executed on f_order table
+    When a discrepancy is found during execution
+    Then log the current state and inputs
+    And provide output for auditing as "Log ID: <unique_identifier>"
