@@ -1,0 +1,61 @@
+Feature: Data Standardization of delivery_dt field in f_order table
+
+  Background:
+    Given the SQL script path is "/Workspace/stg/scripts/f_order.sql"
+    And the Unity Catalog is "purgo_databricks"
+    And the Unity Catalog Schema is "purgo_playground"
+    And the target table is "purgo_playground.purgo_playground.f_order"
+
+  Scenario: Validate delivery_dt is in Decimal (38,0) format as yyyymmdd
+    Given delivery_dt values in f_order table
+     | delivery_dt   |
+     | 20240910      |
+     | 20230615      |
+     | 20210101      |
+    When the delivery_dt is extracted from f_order table
+    Then ensure delivery_dt is a Decimal(38,0) type
+    And validate delivery_dt format is correct yyyymmdd
+    And no conversion is needed for delivery_dt
+
+  Scenario Outline: Report error for invalid delivery_dt format
+    Given delivery_dt values in f_order table
+     | <delivery_dt> |
+    When the delivery_dt is extracted with incorrect format
+    Then convert delivery_dt to correct Decimal(38,0) format
+    And raise error message "<error_message>"
+
+    Examples:
+     | delivery_dt | error_message                                     |
+     | 2024-09-10  | "Incorrect format, conversion to Decimal required" |
+     | 09/15/2024  | "Incorrect format, conversion to yyyymmdd required" |
+     | NULL        | "delivery_dt is missing or null"                   |
+
+  Scenario Outline: Convert and validate delivery_dt from string to Decimal(38,0)
+    Given delivery_dt values from multiple test cases
+     | delivery_dt |
+     | "2024-09-10"|
+     | "2024/09/10"|
+     | "20240910"  |
+    When delivery_dt is stored as string
+    Then convert delivery_dt to Decimal(38,0) format
+    And validate delivery_dt is formatted as yyyymmdd
+
+    Examples:
+     | delivery_dt |
+     | "2024-09-10"|
+     | "2024/09/10"|
+     | "20240910"  |
+
+  Scenario: Handle error conditions with specific messages
+    Given delivery_dt values with potential errors
+    When the delivery_dt validation fails
+    Then capture the error details in dq_reports table
+    And the error message should denote format or null issue
+    And entries in dq_reports should have correct error mappings
+
+  Scenario: Ensure all records are checked for delivery_dt format
+    Given all records in the f_order table
+    When extracting delivery_dt from each record
+    Then verify each delivery_dt is Decimal(38,0)
+    And formatted correctly as yyyymmdd
+    And log any discrepancies for audit purposes
