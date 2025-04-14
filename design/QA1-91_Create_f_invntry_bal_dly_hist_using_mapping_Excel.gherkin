@@ -1,0 +1,66 @@
+Feature: SQL-based Logic for f_invntry_bal_dly_hist Table
+
+  Background:
+    Given the source tables and joins are defined based on the Excel specification
+    And default values and derived logic are specified for fields in the f_invntry_bal_dly_hist table
+    And the schema is purgo_databricks.purgo_playground
+
+  Scenario: Populate f_invntry_bal_dly_hist Table with Hardcoded Values
+    Given SQL logic for g_source_system_cd is a hardcoded value of 'nav_ger'
+    And SQL logic for g_company_cd is a hardcoded value of '1050'
+    And SQL logic for g_company_currency_cd is a hardcoded value of 'EUR'
+    When inserting data into the f_invntry_bal_dly_hist table
+    Then the fields should be populated with specified hardcoded values
+
+  Scenario: Validate and Populate Date Fields with Defaults
+    Given the current date for g_capture_dt_yyyymmdd is always used
+    And expiration date defaults to '99991231' if not found
+    And lot effective date defaults to '19000101' if not found
+    When fetching data from the itemledgerentrieswopd table
+    Then the dates should be populated based on current date or defaults
+
+  Scenario: Concatenation Logic for Key Fields
+    Given concatenation rules are defined
+      | Field                    | Logic                                         |
+      | co_key                   | source_system_cd and g_company_cd             |
+      | plant_key                | source_system_cd and g_plant_cd               |
+      | prod_plant_lot_location_key | source_system_cd, g_item_nbr, g_plant_cd, g_lot_nbr, g_location_cd |
+    When inserting data into the f_invntry_bal_dly_hist table
+    Then the fields should be concatenated as per defined logic
+    
+  Scenario: Conditional Logic for Decimal Fields
+    Given reservation_entry quantity_base is multiplied by -1 when negative for g_qty_allocated
+    And item_qty_on_hand qty_on_hand is populated only with specific location codes for g_qty_available
+      | Location Codes |
+      | HAUPT          |
+      | GERMERING      |
+      | LIN            |
+      | MATRIUM        |
+    When fetching data based on conditional logic
+    Then the fields should reflect the correct populated values
+
+  Scenario: Error Condition Due to Joining Logic
+    Given the item_qty_on_hand table is the driving table
+    And joining conditions are specified for other tables
+    When there is a mismatch in join between item_qty_on_hand and reservation_entry
+    Then an error message should be raised indicating "Join condition failure: item_no_/location_code not matching"
+
+  Scenario Outline: Validation Rules for Data Quality
+    Given uniqueness and completeness rules are applied
+      | Field          | Validation Rule                 |
+      | g_item_nbr     | Unique per system, Complete 100% |
+      | g_location_cd  | Complete 100%                   |
+    When validating data quality for the <Field>
+    Then ensure the <Validation Rule> is adhered with the data
+    
+    Examples:
+      | Field          | Validation Rule                 |
+      | g_item_nbr     | Unique per system, Complete 100% |
+      | g_location_cd  | Complete 100%                   |
+    
+  Scenario: Handling of NULL Values for Specific Fields
+    Given g_qty_in_transit is hardcoded to NULL
+    And g_location_status_cd is hardcoded as none
+    When inserting data into the f_invntry_bal_dly_hist table
+    Then fields should reflect the correct NULL or 'none' values
+
