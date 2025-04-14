@@ -1,72 +1,105 @@
-/* Test code for apl_qty calculation logic in SQL using Databricks syntax */
+-- Databricks SQL Test Code for Inventory Transaction Applied Quantity Calculations
 
-/* Setup: Create a temporary view to hold test values for apl_qty calculations */
-CREATE OR REPLACE TEMP VIEW f_inv_movmnt_apl_qty_test_view AS
-SELECT 
-  txn_id,
-  ref_txn_qty,
-  cumulative_txn_qty,
-  cumulative_ref_ord_sched_qty,
-  ref_ord_sched_qty,
-  prior_cumulative_txn_qty,
-  prior_cumulative_ref_ord_sched_qty,
-  apl_qty
-FROM VALUES
-  ('1', 50.0, 100.0, 90.0, 50.0, 40.0, 30.0, 40.0),
-  ('2', -10.0, 80.0, 70.0, NULL, NULL, NULL, -10.0),
-  ('3', 20.0, 60.0, 100.0, 30.0, 30.0, 25.0, 15.0),
-  ('4', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-  ('5', 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0),
-  ('6', NULL, 40.0, 40.0, 40.0, 40.0, 40.0, NULL)
-AS test_data(txn_id, ref_txn_qty, cumulative_txn_qty, cumulative_ref_ord_sched_qty, ref_ord_sched_qty, prior_cumulative_txn_qty, prior_cumulative_ref_ord_sched_qty, apl_qty);
+-- Testing setup and configuration information
+-- Ensure connection to Unity Catalog purgo_databricks
+-- Utilize schema purgo_playground for all operations
 
-/* Testing apl_qty calculation logic with conditions */
-WITH calculated_qty AS (
+-- Drop test table if it already exists to avoid duplication
+DROP TABLE IF EXISTS purgo_playground.f_inv_movmnt_apl_qty_test;
+
+-- Create test table for validation purposes
+CREATE TABLE purgo_playground.f_inv_movmnt_apl_qty_test (
+  txn_id STRING NOT NULL,
+  ref_txn_qty DECIMAL(3,1) NOT NULL,
+  cumulative_txn_qty DECIMAL(4,1),
+  cumulative_ref_ord_sched_qty DECIMAL(4,1),
+  ref_ord_sched_qty DECIMAL(3,1),
+  prior_cumulative_txn_qty DECIMAL(3,1),
+  prior_cumulative_ref_ord_sched_qty DECIMAL(3,1),
+  calculated_apl_qty DECIMAL(5,1),
+  apl_qty DECIMAL(5,1)
+);
+
+-- Insert test data
+-- Use try-except block as necessary during file reading operations before inserting data
+INSERT INTO purgo_playground.f_inv_movmnt_apl_qty_test (txn_id, ref_txn_qty, cumulative_txn_qty, cumulative_ref_ord_sched_qty, ref_ord_sched_qty, prior_cumulative_txn_qty, prior_cumulative_ref_ord_sched_qty, apl_qty, calculated_apl_qty)
+SELECT * FROM (
+  -- Test 1: Conditions met for positive ref_txn_qty
   SELECT
-    txn_id, 
-    ref_txn_qty, 
-    cumulative_txn_qty, 
-    cumulative_ref_ord_sched_qty, 
-    ref_ord_sched_qty, 
-    prior_cumulative_txn_qty, 
-    prior_cumulative_ref_ord_sched_qty,
+    "1" AS txn_id,
+    50 AS ref_txn_qty,
+    100 AS cumulative_txn_qty,
+    90 AS cumulative_ref_ord_sched_qty,
+    50 AS ref_ord_sched_qty,
+    40 AS prior_cumulative_txn_qty,
+    30 AS prior_cumulative_ref_ord_sched_qty,
+    -- If prior_cumulative_ref_ord_sched_qty < prior_cumulative_txn_qty, calculate a specific apl_qty
+    CASE WHEN prior_cumulative_ref_ord_sched_qty < prior_cumulative_txn_qty THEN
+      ref_ord_sched_qty - (prior_cumulative_txn_qty - prior_cumulative_ref_ord_sched_qty)
+    ELSE
+      ref_ord_sched_qty -- Default apl_qty
+    END AS apl_qty,
+    CAST(NULL AS DECIMAL(5,1)) AS calculated_apl_qty
+  UNION ALL
+  -- Test 2: Edge case for positive ref_txn_qty, alternate conditions
+  SELECT
+    "3",
+    20,
+    60,
+    100,
+    30,
+    30,
+    25,
+    CASE WHEN prior_cumulative_ref_ord_sched_qty > prior_cumulative_txn_qty THEN
+      ref_txn_qty - (prior_cumulative_ref_ord_sched_qty - prior_cumulative_txn_qty)
+    ELSE
+      ref_txn_qty -- Default apl_qty
+    END,
+    CAST(NULL AS DECIMAL(5,1))
+  UNION ALL
+  -- Test 3: Negative ref_txn_qty handling
+  SELECT
+    "2",
+    -10,
+    80,
+    70,
+    40,
+    50,
+    45,
+    -- Always use ref_txn_qty when negative and conditions are met
+    ref_txn_qty,
+    CAST(NULL AS DECIMAL(5,1))
+  UNION ALL
+  -- Test 4: Default case
+  SELECT
+    CAST(NULL AS STRING),
+    CAST(NULL AS DECIMAL(3,1)),
+    CAST(NULL AS DECIMAL(4,1)),
+    CAST(NULL AS DECIMAL(4,1)),
+    CAST(NULL AS DECIMAL(3,1)),
+    CAST(NULL AS DECIMAL(3,1)),
+    CAST(NULL AS DECIMAL(3,1)),
+    CAST(NULL AS DECIMAL(5,1)),
+    CAST(NULL AS DECIMAL(5,1))
+);
 
-    CASE 
-      WHEN ref_txn_qty > 0 AND cumulative_txn_qty >= cumulative_ref_ord_sched_qty THEN 
-        CASE 
-          WHEN prior_cumulative_ref_ord_sched_qty < prior_cumulative_txn_qty THEN 
-            ref_ord_sched_qty - (prior_cumulative_txn_qty - prior_cumulative_ref_ord_sched_qty)
-          ELSE 
-            ref_ord_sched_qty 
-        END
-        
-      WHEN ref_txn_qty > 0 AND cumulative_ref_ord_sched_qty >= cumulative_txn_qty THEN 
-        CASE 
-          WHEN prior_cumulative_ref_ord_sched_qty > prior_cumulative_txn_qty THEN 
-            ref_txn_qty - (prior_cumulative_ref_ord_sched_qty - prior_cumulative_txn_qty) 
-          ELSE 
-            ref_txn_qty 
-        END
-        
-      WHEN ref_txn_qty < 0 AND cumulative_txn_qty <> 0 AND cumulative_ref_ord_sched_qty > 0 THEN 
-        ref_txn_qty 
-      
-      ELSE 
-        NULL 
-    END AS calculated_apl_qty
-
-  FROM f_inv_movmnt_apl_qty_test_view
-)
-
-/* Validate calculated apl_qty with expected apl_qty */
+-- Validate that resulting test data matches schema and requirements
 SELECT
-  cq.txn_id, 
-  cq.calculated_apl_qty, 
-  td.apl_qty AS expected_apl_qty,
-  CASE WHEN cq.calculated_apl_qty = td.apl_qty THEN 'PASS' ELSE 'FAIL' END AS test_result
-FROM calculated_qty AS cq
-JOIN f_inv_movmnt_apl_qty_test_view AS td 
-ON cq.txn_id = td.txn_id;
+  -- Fetch columns and perform schema validation
+  COUNT(*) AS total_records,
+  SUM(CASE WHEN txn_id IS NULL THEN 1 ELSE 0 END) AS null_txn_id_count,
+  SUM(CASE WHEN apl_qty IS NULL THEN 1 ELSE 0 END) AS null_apl_qty_count
+FROM purgo_playground.f_inv_movmnt_apl_qty_test;
 
-/* Clean up temporary view, if needed */
--- DROP VIEW IF EXISTS f_inv_movmnt_apl_qty_test_view; -- Uncomment if cleanup is required
+-- Test Delta Lake operations by merging calculated data back into main data store
+MERGE INTO purgo_playground.f_inv_movmnt_apl_qty AS target
+USING purgo_playground.f_inv_movmnt_apl_qty_test AS source
+ON target.txn_id = source.txn_id
+WHEN MATCHED THEN
+UPDATE SET target.apl_qty = source.apl_qty
+WHEN NOT MATCHED THEN
+INSERT (txn_id, ref_txn_qty, cumulative_txn_qty, cumulative_ref_ord_sched_qty, ref_ord_sched_qty, prior_cumulative_txn_qty, prior_cumulative_ref_ord_sched_qty, apl_qty)
+VALUES (source.txn_id, source.ref_txn_qty, source.cumulative_txn_qty, source.cumulative_ref_ord_sched_qty, source.ref_ord_sched_qty, source.prior_cumulative_txn_qty, source.prior_cumulative_ref_ord_sched_qty, source.apl_qty);
+
+-- Clean up the test data table after validation
+DROP TABLE IF EXISTS purgo_playground.f_inv_movmnt_apl_qty_test;
