@@ -1,0 +1,43 @@
+Feature: Insert new record into purgo_playground.config_master table
+
+  Background:
+    Given the config_master table exists in the purgo_playground schema
+
+  Scenario: Insert new record with specified column values
+    Given an existing record from purgo_playground.config_master table where config_id is 101
+    When retrieving specific fields for modification
+    Then update src_objt_name to "ID_Sales"
+    And update src_sys to "ID_Sales"
+    And update f_format to "ID_MON_Sales_"
+    And update s3_landing_path to "s3a://{s3_bucket}/landing/ID/ID_Sales/"
+    And update s3_archive_path to "s3a://{s3_bucket}/archive/ID/ID_Sales/"
+    And update country to "ID"
+    And update region to "ID"
+    And update affiliate_group to "ID"
+    And update affiliate to "ID"
+    And update src_layer to "ID_Sales"
+    And update target_src_sys to "ID_Sales"
+    And update delta_stg_tables to "stg_ID_sales"
+    And update source_path to "/SecureFtp/-InternalX/ID/IN/DATA/Sales/"
+    And update actual_file_name to '{"ID_MON_Sales_*": "stg_ID_wholesaler"}'
+    And update dag_id to "LOAD_SALES_ID"
+    And insert the edited record into the purgo_playground.config_master table
+
+  Scenario Outline: Validate new record entry with error scenarios
+    Given a new record with src_objt_name "<src_objt_name>" and src_sys "<src_sys>"
+    When the record is validated before insertion
+    Then ensure s3_landing_path is a non-empty string
+    And s3_archive_path is a non-empty string
+    And source_path is approached correctly
+    And "<config_id>" must be unique
+    Examples:
+      | src_objt_name | src_sys   | config_id |
+      | ID_Sales      | ID_Sales  | 101       |
+      | ID_Sales      | INVALID   | 102       |
+
+  Scenario: Handle error conditions and logging
+    Given the insertion process for a new record
+    When any validation rule fails
+    Then log the error message "Validation failed: non-unique config_id"
+    And raise an alert "Record insertion unsuccessful due to data validation"
+
