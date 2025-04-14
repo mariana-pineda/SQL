@@ -1,0 +1,51 @@
+Feature: Masking Invoice Numbers in d_product_revenue_clone table
+
+  Background:
+    Given the table purgo_playground.purgo_playground.d_product_revenue exists
+    And the table purgo_playground.purgo_playground.d_product_revenue_clone does not exist
+
+  Scenario: Clone d_product_revenue table to d_product_revenue_clone
+    When the d_product_revenue_clone table is to be created
+    Then the table is created as a replica of d_product_revenue
+
+  Scenario: Mask last 4 digits of Invoice Numbers in invoice_number column
+    Given the table purgo_playground.purgo_playground.d_product_revenue_clone is created
+    When PySpark logic is executed to mask invoice numbers
+    Then the last four digits of each invoice_number are replaced with '****'
+
+  Scenario Outline: Validate successful masking of invoice numbers
+    Given the invoice_number is '<original_invoice_number>'
+    When the PySpark logic is applied on the column
+    Then the result should be '<masked_invoice_number>'
+  
+    Examples:
+      | original_invoice_number | masked_invoice_number |
+      | 1234234534              | 123423****            |
+      | 9876543210              | 987654****            |
+      | 1111222233              | 111122****            |
+
+  Scenario Outline: Handle error on invalid data type
+    Given the invoice_number is '<invalid_invoice_number>'
+    When PySpark logic is applied
+    Then an error message "Invalid data type for invoice_number" should be shown
+  
+    Examples:
+      | invalid_invoice_number |
+      | null                   |
+      | abc123xyz              |
+      | 1234.5678              |
+
+  Scenario: Verify access rights for table operations
+    Given the user executing PySpark logic
+    When permissions are checked for dropping and creating tables
+    Then user must have rights to perform table operations in Unity Catalog: purgo_playground
+
+  Scenario: Ensure backup and recovery protocols
+    Given a table is dropped
+    When an error occurs during the drop
+    Then a backup exists to restore the table
+
+  Scenario: Check data type of invoice_number column
+    Given the schema of table purgo_playground.purgo_playground.d_product_revenue
+    When checking the data type of invoice_number
+    Then it should be confirmed as bigint
