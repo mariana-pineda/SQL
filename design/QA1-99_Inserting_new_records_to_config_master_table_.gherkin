@@ -1,43 +1,71 @@
-Feature: Insert new record into purgo_playground.config_master table
+Feature: Insert new region record into config_master table
 
   Background:
-    Given the config_master table exists in the purgo_playground schema
+    Given the {{config_master}} table exists in the Unity Catalog purgo_playground
 
-  Scenario: Insert new record with specified column values
-    Given an existing record from purgo_playground.config_master table where config_id is 101
-    When retrieving specific fields for modification
-    Then update src_objt_name to "ID_Sales"
-    And update src_sys to "ID_Sales"
-    And update f_format to "ID_MON_Sales_"
-    And update s3_landing_path to "s3a://{s3_bucket}/landing/ID/ID_Sales/"
-    And update s3_archive_path to "s3a://{s3_bucket}/archive/ID/ID_Sales/"
-    And update country to "ID"
-    And update region to "ID"
-    And update affiliate_group to "ID"
-    And update affiliate to "ID"
-    And update src_layer to "ID_Sales"
-    And update target_src_sys to "ID_Sales"
-    And update delta_stg_tables to "stg_ID_sales"
-    And update source_path to "/SecureFtp/-InternalX/ID/IN/DATA/Sales/"
-    And update actual_file_name to '{"ID_MON_Sales_*": "stg_ID_wholesaler"}'
-    And update dag_id to "LOAD_SALES_ID"
-    And insert the edited record into the purgo_playground.config_master table
+  Scenario: Retrieve and modify existing record for new region
+    Given a record exists in the {{config_master}} table with src_objt_name "Sales"
+    When I retrieve the record
+    Then I modify the record with the following values
+      | src_objt_name          | ID_Sales                         |
+      | src_sys                | ID_Sales                         |
+      | f_format               | ID_MON_Sales_                    |
+      | s3_landing_path        | s3a://{s3_bucket}/landing/ID/ID_Sales/ |
+      | s3_archive_path        | s3a://{s3_bucket}/archive/ID/ID_Sales/ |
+      | country                | ID                               |
+      | region                 | ID                               |
+      | affiliate_group        | ID                               |
+      | affiliate              | ID                               |
+      | src_layer              | ID_Sales                         |
+      | target_src_sys         | ID_Sales                         |
+      | delta_stg_tables       | stg_ID_sales                     |
+      | source_path            | /SecureFtp/-InternalX/ID/IN/DATA/Sales/ |
+      | actual_file_name       | {"ID_MON_Sales_*": "stg_ID_wholesaler"} |
+      | dag_id                 | LOAD_SALES_ID                    |
+    Then I append the modified record back to the {{config_master}} table
 
-  Scenario Outline: Validate new record entry with error scenarios
-    Given a new record with src_objt_name "<src_objt_name>" and src_sys "<src_sys>"
-    When the record is validated before insertion
-    Then ensure s3_landing_path is a non-empty string
-    And s3_archive_path is a non-empty string
-    And source_path is approached correctly
-    And "<config_id>" must be unique
+  Scenario Outline: Validate error conditions and insertion
+    Given the following values are being inserted
+      | src_objt_name  | ID_Sales        |
+      | src_sys        | ID_Sales        |
+      | s3_landing_path| <landing_path>  |
+      | s3_archive_path| <archive_path>  |
+    When I validate these values
+    Then "<expected_message>" should be returned
+
     Examples:
-      | src_objt_name | src_sys   | config_id |
-      | ID_Sales      | ID_Sales  | 101       |
-      | ID_Sales      | INVALID   | 102       |
+      | landing_path                        | archive_path                        | expected_message                    |
+      | s3a://{{s3_bucket}}/landing/ID/ID_Sales/ | s3a://{{s3_bucket}}/archive/ID/ID_Sales/ | Success                             |
+      | invalid_path                        | s3a://{{s3_bucket}}/archive/ID/ID_Sales/ | Error: Invalid Landing Path        |
+      | s3a://{{s3_bucket}}/landing/ID/ID_Sales/ | invalid_path                        | Error: Invalid Archive Path        |
 
-  Scenario: Handle error conditions and logging
-    Given the insertion process for a new record
-    When any validation rule fails
-    Then log the error message "Validation failed: non-unique config_id"
-    And raise an alert "Record insertion unsuccessful due to data validation"
+  Scenario: Confirm column updates and dependencies
+    Given the config_id column is unique
+    When a new record is added
+    Then ensure no other column is updated incorrectly
 
+  Scenario: Validate integrity and archival strategy
+    Given a historical data integrity requirement
+    When a new record is added
+    Then ensure previous records are archived properly
+
+  Scenario: Validate constraints before insertion
+    Given data validation constraints are applied
+    When inserting modified values into {{config_master}}
+    Then integrity checks for src_objt_name and src_sys are performed
+
+  Scenario: Validate logging and error reporting
+    Given logging is enabled for operations
+    When an insertion error occurs
+    Then an error message with a tracking ID is logged
+
+  Scenario Outline: Comprehensive operational validation
+    Given a new record is prepared for insertion
+    When inserting data with <validation_type>
+    Then <result> should be confirmed
+
+    Examples:
+      | validation_type | result   |
+      | Integrity       | Pass     |
+      | Validation      | Pass     |
+      | Logging         | Success  |
