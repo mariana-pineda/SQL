@@ -1,0 +1,49 @@
+Feature: Calculation of Applied Quantity (apl_qty) in Inventory Transactions
+
+  Background:
+    Given the inventory transaction data is available in 'purgo_databricks' within the schema 'purgo_playground'
+    And the table 'f_inv_movmnt_apl_qty' contains columns txn_id, ref_txn_qty, cumulative_txn_qty, cumulative_ref_ord_sched_qty, ref_ord_sched_qty, prior_cumulative_txn_qty, prior_cumulative_ref_ord_sched_qty, apl_qty
+
+  Scenario Outline: Calculate apl_qty for positive reference transaction quantities
+    Given ref_txn_qty is greater than 0
+    And cumulative_txn_qty is greater than or equal to cumulative_ref_ord_sched_qty
+    When prior_cumulative_ref_ord_sched_qty is less than prior_cumulative_txn_qty
+    Then apl_qty should be set to <ref_ord_sched_qty> minus the difference between <prior_cumulative_txn_qty> and <prior_cumulative_ref_ord_sched_qty>
+    Examples:
+      | txn_id | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty |
+      | 1      | 50          | 100                | 90                          | 50               | 40                       | 30                                 |
+
+  Scenario: Fallback apl_qty to reference order when conditions are not met
+    Given ref_txn_qty is greater than 0
+    And cumulative_txn_qty is greater than or equal to cumulative_ref_ord_sched_qty
+    When prior_cumulative_ref_ord_sched_qty is not less than prior_cumulative_txn_qty
+    Then apl_qty should be set to ref_ord_sched_qty
+
+  Scenario Outline: Calculate apl_qty for cumulative ref order schedule higher than cumulative transaction
+    Given ref_txn_qty is greater than 0
+    And cumulative_ref_ord_sched_qty is greater than or equal to cumulative_txn_qty
+    When prior_cumulative_ref_ord_sched_qty is greater than prior_cumulative_txn_qty
+    Then apl_qty should be set to <ref_txn_qty> minus the difference between <prior_cumulative_ref_ord_sched_qty> and <prior_cumulative_txn_qty>
+    Examples:
+      | txn_id | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty |
+      | 3      | 20          | 60                 | 100                         | 30               | 30                       | 25                                 |
+
+  Scenario: Fallback apl_qty to reference transaction when conditions are not met
+    Given ref_txn_qty is greater than 0
+    And cumulative_ref_ord_sched_qty is greater than or equal to cumulative_txn_qty
+    When prior_cumulative_ref_ord_sched_qty is not greater than prior_cumulative_txn_qty
+    Then apl_qty should be set to ref_txn_qty
+
+  Scenario Outline: Set apl_qty for negative reference transaction quantities
+    Given ref_txn_qty is less than 0
+    And cumulative_txn_qty is not equal to 0
+    And cumulative_ref_ord_sched_qty is greater than 0
+    Then apl_qty should be set to ref_txn_qty
+    Examples:
+      | txn_id | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty |
+      | 2      | -10         | 80                 | 70                          | 40               | 50                       | 45                                 |
+
+  Scenario: Default condition for unset apl_qty
+    Given ref_txn_qty does not satisfy condition 1, 2, or 3
+    Then apl_qty should be set to NULL
+
