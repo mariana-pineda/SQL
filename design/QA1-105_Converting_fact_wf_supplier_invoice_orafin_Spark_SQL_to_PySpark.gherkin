@@ -1,0 +1,61 @@
+Feature: Conversion of Spark.SQL to PySpark
+
+  Background:
+    Given the environment configuration is set as per requirements
+    And dependencies such as Constants and ReusableFunctions are available
+
+  Scenario Outline: Successful conversion of SQL code to PySpark
+    Given the raw data is loaded from <sourceTable> into a DataFrame
+    When the transformation logic is applied to the DataFrames
+    Then the resulting DataFrame should be written to <targetTable> in Unity Catalog
+    And the partitionOverwriteMode should be set to "dynamic"
+    And the partition key should be "<partitionKey>"
+    And column formats and types should be respected
+
+    Examples:
+      | sourceTable                        | targetTable                 | partitionKey |
+      | raw_unity_catalog.dw_ap_sla_aging_invoice_ca | purgo_playground.f_supplier_invoice | invoice_id   |
+      | raw_unity_catalog.dw_ap_sla_expense_dist_cf | purgo_playground.supplier_invoice   | gl_code_combination_id |
+
+  Scenario: Handling missing dependencies with error
+    Given dependencies like Constants and ReusableFunctions are not available
+    When the Spark job is executed
+    Then an error message "Required dependencies missing: Constants, ReusableFunctions" should be logged
+
+  Scenario: Error in table resolution
+    Given an incorrect source table name "raw_unity_catalog.invalid_table"
+    When the job tries to access the invalid table
+    Then an error message "Table raw_unity_catalog.invalid_table does not exist" should be thrown
+
+  Scenario Outline: Validation of data formats and casting
+    Given data is read from <sourceTable> with expected formats
+    When the data is cast and transformed
+    Then ensure all dates are in "yyyyMMdd" format
+    And ensure all amounts are cast to double
+    And strings should not exceed expected lengths
+
+    Examples:
+      | sourceTable                          |
+      | raw_unity_catalog.dw_ap_sla_aging_invoice_ca |
+      | raw_unity_catalog.dw_ap_sla_expense_dist_cf |
+
+  Scenario: Validation of partition overwrite mode setting
+    Given the Spark config for sources.partitionOverwriteMode
+    When setting is checked
+    Then ensure it is "dynamic"
+
+  Scenario: Handling missing configuration values
+    Given a missing config for dbutils.widgets
+    When attempting to retrieve configuration
+    Then an error message "Configuration value for <configKey> is missing" should be thrown
+
+  Scenario Outline: Data-driven tests for invoice transformation
+    Given selected columns from <sourceTable>
+    When transformation logic is applied
+    Then validate the presence of transformed data in output table
+    And transformed values should match expected results
+
+    Examples:
+      | sourceTable | expectedOutput             |
+      | raw_unity_catalog.dw_ap_sla_aging_invoice_ca | purgo_playground.supplier_invoice |
+
