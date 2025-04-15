@@ -1,0 +1,56 @@
+Feature: Calculate APPLIED QTY based on inventory transaction allocations
+
+  Background:
+    Given the following tables exist:
+      | Table Name | Schema                                  |
+      | f_inv_movmnt_apl_qty         | purgo_playground.purgo_playground |
+      | f_inv_movmnt_apl_qty_test    | purgo_playground.purgo_playground |
+      | f_inv_movmnt_apl_qty_result  | purgo_playground.purgo_playground |
+      And all data types and structures are consistent across related tables
+
+  Scenario Outline: Happy path for calculating apl_qty
+    Given a transaction in the inventory with the following data:
+      | txn_id | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty |
+      | <txn_id> | <ref_txn_qty> | <cumulative_txn_qty> | <cumulative_ref_ord_sched_qty> | <ref_ord_sched_qty> | <prior_cumulative_txn_qty> | <prior_cumulative_ref_ord_sched_qty> |
+    When the ref_txn_qty is greater than 0 
+      And the cumulative_txn_qty is greater than or equal to cumulative_ref_ord_sched_qty
+    Then set apl_qty to the calculated value based on condition 1
+    
+    Examples:
+      | txn_id | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty |
+      | 1      | 50          | 100                | 90                           | 50               | 40                        | 30                                |
+
+    When the ref_txn_qty is greater than 0 
+      And the cumulative_ref_ord_sched_qty is greater than or equal to cumulative_txn_qty
+    Then set apl_qty to the calculated value based on condition 2
+
+    Examples:
+      | txn_id | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty |
+      | 2      | -10         | 80                 | 70                           | 40               | 50                        | 45                                |
+
+    When the ref_txn_qty is less than 0 
+      And cumulative_txn_qty is not equal to 0 
+      And cumulative_ref_ord_sched_qty is greater than 0
+    Then set apl_qty to the calculated value based on condition 3
+
+    Examples:
+      | txn_id | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty |
+      | 2      | -10         | 80                 | 70                           | 40               | 50                        | 45                                |
+
+  Scenario: Error conditions and default assignment
+    Given the transaction does not meet any of the specified conditions
+    When apl_qty cannot be calculated with the provided logic
+    Then set apl_qty to NULL
+    And log the event for audit purposes
+
+  Scenario Outline: Data-driven scenarios for validation
+    Given sample data records in target table f_inv_movmnt_apl_qty_test
+      And records match the schema structure
+    When validation rules for apl_qty calculation are applied
+    Then ensure correct apl_qty computation or error messages are logged
+
+    Examples:
+      | txn_id | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty |
+      | 1      | 50          | 100                | 90                           | 50                | 40                        | 30                                |
+      | 2      | -10         | 80                 | 70                           | 40                | 50                        | 45                                |
+      | 3      | 20          | 60                 | 100                          | 30                | 30                        | 25                                |
