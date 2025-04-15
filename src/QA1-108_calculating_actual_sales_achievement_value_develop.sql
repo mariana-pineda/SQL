@@ -1,16 +1,16 @@
-/* Databricks SQL query to calculate actual sales value for each brand by country and territory */
+/* SQL query to calculate actual sales value for each brand by country and territory */
 
-/* Joining sales tables and validating against control table */
+/* CTE to join sales data based on specified columns */
 WITH SalesData AS (
   SELECT 
     itm.country_code,
     itm.brand_name,
     itm.territory_id,
-    date_part('month', itm.sales_month) AS sales_month,
-    date_part('year', itm.sales_month) AS sales_year,
+    MONTH(itm.sales_month) AS sales_month,
+    YEAR(itm.sales_month) AS sales_year,
     itm.sales_value,
-    date_part('month', ttm.fiscal_date) AS fiscal_month,
-    date_part('year', ttm.fiscal_date) AS fiscal_year,
+    MONTH(ttm.fiscal_date) AS fiscal_month,
+    YEAR(ttm.fiscal_date) AS fiscal_year,
     ttm.sales_net_price_local,
     itm.source_system_name
   FROM purgo_playground.t3_itm_territory_sales itm
@@ -18,11 +18,11 @@ WITH SalesData AS (
     ON itm.country_code = ttm.country_code
     AND itm.brand_name = ttm.brand_name
     AND itm.territory_id = ttm.territory_id
-    AND date_part('month', itm.sales_month) = date_part('month', ttm.fiscal_date)
-    AND date_part('year', itm.sales_month) = date_part('year', ttm.fiscal_date)
+    AND MONTH(itm.sales_month) = MONTH(ttm.fiscal_date)
+    AND YEAR(itm.sales_month) = YEAR(ttm.fiscal_date)
 )
 
-/* Calculating actual_value for valid records */
+/* Validating source_system existence in the control table and summing values */
 SELECT 
   brand_name,
   country_code,
@@ -32,7 +32,7 @@ FROM SalesData
 WHERE source_system_name IN (SELECT source_system FROM purgo_playground.control_table)
 GROUP BY brand_name, country_code, territory_id
 
-/* Handling mismatched date records for flagging */
+/* Handling mismatched date records */
 UNION ALL
 SELECT
   brand_name,
@@ -42,7 +42,7 @@ SELECT
 FROM SalesData
 WHERE sales_month != fiscal_month OR sales_year != fiscal_year
 
-/* Exclusion of records with NULL fields */
+/* Excluding records with NULL fields */
 UNION ALL
 SELECT
   brand_name,
