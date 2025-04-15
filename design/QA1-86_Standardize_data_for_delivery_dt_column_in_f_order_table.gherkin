@@ -1,0 +1,64 @@
+Feature: Data Standardization for delivery_dt in f_order table
+
+  Background:
+    Given the table "purgo_playground.purgo_playground.f_order"
+    And the column "delivery_dt" datatype is Decimal(38,0)
+    And the acceptable date format is "yyyymmdd"
+
+  Scenario: Successful transformation of delivery_dt
+    Given delivery_dt values are in correct format and datatype
+    When the SQL logic is applied to convert to Decimal(38,0)
+    Then delivery_dt should maintain yyyymmdd format 
+    And no transformation errors should occur
+
+  Scenario Outline: Invalid delivery_dt format or datatype
+    Given delivery_dt value "<delivery_dt>"
+    When the SQL logic checks format and datatype
+    Then an error message "Invalid datatype or format for delivery_dt" should be displayed
+    And the record should not be processed for transformation
+
+  Examples:
+    | delivery_dt  |
+    | 2024-09-10   |
+    | 10/09/2024   |
+    | timestamp    |
+
+  Scenario Outline: Invalid date range in delivery_dt
+    Given delivery_dt value "<delivery_dt>"
+    When the SQL logic checks the date range
+    Then an error message "Date not within acceptable range for delivery_dt" should be displayed
+
+  Examples:
+    | delivery_dt  |
+    | 00000000     |
+    | 99999999     |
+
+  Scenario: Successful conversion and integration verification
+    Given all delivery_dt values successfully converted to Decimal(38,0)
+    And are in yyyymmdd format
+    When integrated with external datasets
+    Then the standardized data should align with reporting standards
+    And integration should occur without errors
+
+  Scenario Outline: Unhandled exceptions during transformation
+    Given delivery_dt value "<delivery_dt>"
+    When unexpected datatype or conversion error occurs
+    Then an error message "Unhandled exception during delivery_dt transformation" should be logged
+
+  Examples:
+    | delivery_dt |
+    | NULL        |
+    | NaN         |
+    | " "         |
+
+  Scenario: Additional data cleansing requirements verification
+    Given converted delivery_dt values
+    When cleansing steps are applied if required
+    Then delivery_dt should remain compliant with target table requirements
+    And no additional cleansing errors should occur
+
+  Scenario: Verification of SQL logic integration with other datasets
+    Given integration requirement with "purgo_playground.purgo_playground.supply_chain_delivery"
+    When the SQL logic executes
+    Then the interaction with other datasets should be validated
+    And no mismatched data should occur during the process
