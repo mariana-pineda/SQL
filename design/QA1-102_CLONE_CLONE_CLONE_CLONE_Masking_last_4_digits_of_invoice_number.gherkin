@@ -1,0 +1,52 @@
+Feature: Mask Invoice Number in Product Revenue Clone Table
+
+  Background:
+    Given the Unity Catalog schema is purgo_playground
+    And the original table is purgo_databricks.purgo_playground.d_product_revenue
+    And a clone table for processing is purgo_databricks.purgo_playground.d_product_revenue_clone
+
+  Scenario: Setup clone table for processing
+    Given the clone table purgo_databricks.purgo_playground.d_product_revenue_clone exists
+      And it should be dropped to ensure a clean state
+    When a new clone table is created from d_product_revenue
+    Then the schema and data should replicate the source table
+
+  Scenario Outline: Mask invoice number in clone table
+    Given the field invoice_number in the clone table is of type <data_type>
+    When applying the PySpark logic to mask the last 4 digits
+    Then the invoice_number should appear as '123423****' for the example '1234234534'
+      And masked values should be saved back to purgo_databricks.purgo_playground.d_product_revenue_clone
+
+    Examples:
+      | data_type |
+      | bigint    |
+      | string    |
+
+  Scenario: Validate the masking logic
+    Given a non-empty invoice_number field in the clone table
+    When verifying masking logic
+    Then no invoice_number should retain its original form
+      And masked invoice_numbers should end with '****'
+
+  Scenario Outline: Handle erroneous data and failure cases
+    Given the invoice_number contains <erroneous_data>
+    When attempting to mask the invoice_number
+    Then the operation should fail gracefully 
+      And log an error message <error_message>
+
+    Examples:
+      | erroneous_data | error_message                           |
+      | null           | "Invoice number cannot be null."        |
+      | negative value | "Invoice number must be a positive."    |
+      | non-numeric    | "Invoice number must contain digits."   |
+
+  Scenario: Verify rollback on failure
+    Given a scenario where masking operation fails due to invalid data
+    When the rollback is triggered
+    Then the clone table should maintain the integrity of original data
+
+  Scenario: Ensure logging and error tracing 
+    Given the masking logic is in operation
+    When an error occurs
+    Then detailed logs should capture the failure point
+      And alerts should be sent to the data engineering team
