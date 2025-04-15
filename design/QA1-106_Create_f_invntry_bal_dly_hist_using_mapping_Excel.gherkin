@@ -1,0 +1,59 @@
+Feature: SQL Logic for f_invntry_bal_dly_hist Table Construction
+
+Background:
+  Given tables are in the schema purgo_playground
+  And the data needs to be sourced from multiple tables with specific join conditions
+
+Scenario Outline: Construct daily inventory balance history with valid data
+  Given the item quantity is sourced from purgo_playground.item_qty_on_hand
+  And the item ledger entries are sourced from purgo_playground.itemledgerentrieswopd with latest posting_date records
+  And reservation entries are filtered with reservation_status = '0' and source_type='37'
+  And join purgo_playground.itemledgerentrieswopd on item_no_ and location_code
+  And concatenate the source_system_cd and <column_names> for unique keys
+  When mapping fields according to the provided Excel sheet definitions
+  Then construct the f_invntry_bal_dly_hist table with the following fields and logic:
+
+    | Target Field                | Mapping Logic                                                                                             |
+    |-----------------------------|-----------------------------------------------------------------------------------------------------------|
+    | co_key                      | Concatenate source_system_cd and g_company_cd                                                             |
+    | g_account                   | Map from sap_master_data profit_center                                                                    |
+    | g_assignment_type           | Hardcoded to 'Account'                                                                                    |
+    | g_capture_dt_yyyymmdd       | Current system date                                                                                      |
+    | g_company_cd                | Hardcoded to '1050'                                                                                       |
+    | g_company_currency_cd       | Hardcoded to 'EUR'                                                                                        |
+    | g_dnsa_dt_yyyymmdd          | Map from itemledgerentrieswopd.Expiration_Date                                                            |
+    | g_expiration_dt_yyyymmdd    | Default value '99991231' if not represented, else from itemledgerentrieswopd.Expiration_Date               |
+    | g_item_nbr                  | Map from itemledgerentrieswopd.Item_No_                                                                   |
+    | g_location_cd               | Map from itemledgerentrieswopd.Location_Code                                                              |
+    | g_location_status_cd        | Hardcoded to 'none'                                                                                     |
+    | g_lot_effective_dt_yyyymmdd | Map from itemledgerentrieswopd.Posting_Date                                                               |
+    | g_lot_nbr                   | Map from itemledgerentrieswopd.serial_no_, lot_no_, default 'none' if blank                               |
+    | g_lot_status_cd             | Hardcoded to 'none'                                                                                     |
+    | g_plant_cd                  | Hardcoded to 'CAGER'                                                                                     |
+    | g_qty_allocated             | Logic described in Excel sheet notes, and sourced from reservation_entry quantity_base                     |
+    | g_qty_available             | Logic described in Excel sheet notes, and sourced from item_qty_on_hand.qty_on_hand                       |
+    | g_qty_financial_nettable    | Logic described in Excel sheet notes, and sourced from item_qty_on_hand.qty_on_hand                       |
+    | g_qty_in_transit            | Hardcoded to NULL                                                                                        |
+    | g_qty_mrp_nettable          | Logic described in Excel sheet notes, and sourced from item_qty_on_hand.qty_on_hand                       |
+    | g_qty_on_hand               | Map from item_qty_on_hand.qty_on_hand                                                                    |
+    | g_qty_shippable             | Logic described in Excel sheet notes, and sourced from item_qty_on_hand.qty_on_hand                       |
+    | g_source_system_cd          | Hardcoded to 'nav_ger'                                                                                   |
+    | g_unit_cost_company_currency| Map from Itemwopd.Standard_Cost                                                                          |
+    | plant_key                   | Concatenate source_system_cd and g_plant_cd                                                               |
+    | plant_location_key          | Concatenate source_system_cd, g_plant_cd, g_location_cd                                                   |
+    | prod_key                    | Concatenate source_system_cd, g_item_nbr                                                                  |
+    | prod_plant_key              | Concatenate source_system_cd, g_item_nbr, g_plant_cd                                                      |
+    | prod_plant_location_key     | Concatenate source_system_cd, g_item_nbr, g_plant_cd, g_location_cd                                       |
+    | prod_plant_lot_key          | Concatenate source_system_cd, g_item_nbr, g_plant_cd, g_lot_nbr                                           |
+    | prod_plant_lot_location_key | Concatenate source_system_cd, g_item_nbr, g_plant_cd, g_lot_nbr, g_location_cd                            |
+
+  Examples:
+    | column_names                  |
+    | g_company_cd                  |
+    | g_plant_cd                    |
+    | g_item_nbr                    |
+
+Scenario: Handle error scenarios in data mapping
+  Given incomplete data fields or incorrect values in source tables
+  When validating data quality and completeness according to rules
+  Then report error message "Data validation failed: Missing or incorrect values in source data."
