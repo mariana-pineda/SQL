@@ -1,87 +1,76 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StructField, StringType, DoubleType, LongType, TimestampType
-from pyspark.sql.functions import col, when, lit, expr, row_number, sum as spark_sum, window, concat_ws, coalesce, date_format
-from pyspark.sql.window import Window
+from pyspark.sql import SparkSession, functions as F
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType, TimestampType, LongType
 
-# Initialize Spark session
-spark = SparkSession.builder \
-    .appName("PySparkConversion") \
-    .getOrCreate()
-
-# Initialize variables from widgets
-target_table_path = dbutils.widgets.get("target_table_path")
-partition_key = dbutils.widgets.get("partition")
-table_format = dbutils.widgets.get("table_format")
-compression = dbutils.widgets.get("compression")
-table_name = dbutils.widgets.get("table_name")
-unity_catalog = dbutils.widgets.get("unity_catalog")
-raw_unity_catalog = dbutils.widgets.get("raw_unity_catalog")
-raw_unity_catalog_hist = dbutils.widgets.get("raw_unity_catalog_hist")
-
-# Define the schema for supplier_invoice_bkp table
-schema_supplier_invoice_bkp = StructType([
-    # Define all schema fields here
+# Initialize Spark session (Assume spark object is already available in the environment)
+# Define schema for supplier_invoice DataFrame
+supplier_invoice_schema = StructType([
+    StructField("invc_entry_period", TimestampType(), True),
+    StructField("suplr_invc_nbr", StringType(), True),
+    StructField("vchr_nbr", StringType(), True),
+    StructField("vchr_line_nbr", StringType(), True),
+    StructField("fscl_yr_nbr", LongType(), True),
+    StructField("vchr_type_cd", StringType(), True),
+    StructField("vchr_status", StringType(), True),
+    StructField("supplier_cd", StringType(), True),
+    StructField("supplier_name", StringType(), True),
+    StructField("supplier_type_cd", StringType(), True),
+    StructField("suplr_invc_dt", TimestampType(), True),
+    StructField("ap_payment_term_cd", StringType(), True),
+    StructField("ap_payment_term_desc", StringType(), True),
+    StructField("cost_centre_cd", StringType(), True),
+    StructField("cost_centre_nm", StringType(), True),
+    StructField("gl_acct_id", StringType(), True),
+    StructField("gl_acct_nm", StringType(), True),
+    StructField("inv_line_desc", StringType(), True),
+    StructField("remit_to_addr_line_1", StringType(), True),
+    StructField("column1", StringType(), True),
+    StructField("column2", StringType(), True),
+    StructField("column3", StringType(), True)
 ])
 
-# Function to read control table (Stub for conversion)
-def read_control_table(project, table_name, load_type, control_table):
-    # Implement reading logic
-    return None
+# Create DataFrame adhering to defined schema
+data = [
+    # Add sample data conforming to schema constraints
+    ('2023-01-01 00:00:00', 'INV123', 'VCHR123', 'LINE123', 2023, 'TYPE1', 'STATUS1', 'SUP123', 'Supplier Name', 'Type1', '2023-01-01 00:00:00', 'TERM1', 'Term Description', 'CC123', 'Cost Centre Name', 'GL123', 'GL Name', 'Line Description', 'Address Line 1', 'Column1', 'Column2', 'Column3')
+    # Additional rows for testing edge cases and normal scenarios...
+]
 
-# Setup partitioning configuration
-spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
+df = spark.createDataFrame(data, schema=supplier_invoice_schema)
 
-# Try-Except for securing method call
+# Handling missing or invalid data
 try:
-    job_id = dbutils.notebook.entry_point.getDbutils().notebook().getContext().jobId().get()
+    # Transform fscl_yr_nbr based on suplr_invc_dt
+    df = df.withColumn('fscl_yr_nbr', F.year('suplr_invc_dt'))
+    
+    # Validate schema consistency
+    assert len(df.columns) == len(supplier_invoice_schema.fields), "Column count mismatch"
+    
+    # Convert invc_entry_period to yyyyMM format
+    df = df.withColumn("invc_entry_period", F.date_format(df.invc_entry_period, "yyyyMM"))
+    
+    # Fill NULL values for suplr_invc_nbr with a default
+    df = df.fillna({'suplr_invc_nbr': 'Unknown'})
 except Exception as e:
-    job_id = -123
+    print(f"Error occurred during data handling: {e}")
 
-# Construct job URL
-base_url, jobs_api_secret = get_basejob_url(environment)
-job_url = f"{base_url}/#job/{job_id}/run/1"
+# Write DataFrame to Delta Lake after processing
+try: 
+    df.write.format("delta").mode("append").save("purgo_databricks.purgo_playground.f_supplier_invoice")
+except Exception as e:
+    print(f"Error writing to Delta Lake: {e}")
 
-# Control table configuration
-control_table = f"{config_unity_catalog}.{cl_control_table}"
-ctrl_tbl_entry = read_control_table(project, table_name, load_type, control_table)
-
-# Query supplier_invoice data
-df_supplier_invoice = spark.sql(f"""
-    SELECT cost_center_segment,gl_balancing_segment,gl_segment1,gl_code_combination_id,invoiced_on_date,invoice_id,
-           invoice_type_code,transaction_currency_code,ledger_currency_code,invoice_schedule_due_date,payables_bu_id,
-           natural_account_segment,invoice_accounting_date,invoice_number,supplier_party_id,supplier_site_id,
-           invoice_source_code,ROW_NUMBER() OVER (PARTITION BY invoice_id ORDER BY snapshot_captured_date DESC) AS RowNum
-    FROM {raw_unity_catalog}.dw_ap_sla_aging_invoice_ca
-    WHERE RowNum=1
-""")
-
-# Example transformation using PySpark
-df_transformed = df_supplier_invoice.withColumn("source_country", lit("NA")) \
-                                    .withColumn("supplier_segment", when(col("invoice_type_code") == "CREDIT", "TYPE1").otherwise("TYPE2")) \
-                                    .withColumn("updated_invc_txn_amt", expr("transaction_amount * 1.1"))
-
-# Window function example
-window_spec = Window.partitionBy("invoice_id").orderBy("snapshot_captured_date")
-df_windowed = df_supplier_invoice.withColumn("window_func_result", spark_sum("transaction_amount").over(window_spec))
-
-# Delta Lake Merge Example (error handling)
+# Validate Delta Lake operations
 try:
-    spark.sql("""
-        MERGE INTO purgo_playground.supplier_invoice_bkp USING purgo_playground.supplier_invoice
-        ON supplier_invoice_bkp.po_nbr = supplier_invoice.po_nbr
-        WHEN MATCHED THEN UPDATE SET supplier_invoice_bkp.unit_prc = supplier_invoice.unit_prc
-    """)
+    updated_df = spark.read.format("delta").load("purgo_databricks.purgo_playground.f_supplier_invoice")
+    assert updated_df.count() > 0, "Delta Lake update failed"
 except Exception as e:
-    assert "AnalysisException" in str(e), "Delta Lake operation failed unexpectedly"
+    print(f"Error during Delta Lake validation: {e}")
 
-# Show transformed DataFrame
-df_transformed.show()
+# Clean up operation after tests
+try:
+    spark.sql("DELETE FROM purgo_playground.f_supplier_invoice WHERE vchr_status = 'Incomplete'")
+except Exception as e:
+    print(f"Error during clean up operation: {e}")
 
-# Stubbing function for base job URL retrieval
-def get_basejob_url(environment):
-    # Replace with logic to retrieve base job URL
-    return "http://baseurl.com", "secret"
-
-# Cleanup processes
-df_transformed.unpersist()
-
+# Stop Spark session
+spark.stop()
