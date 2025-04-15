@@ -1,78 +1,85 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, year, month, sum, count, lit, when
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, LongType, DoubleType
+from pyspark.sql.functions import col, year, month, when, count, sum, round
 
-spark = SparkSession.builder.appName("Databricks Test Data Generation").getOrCreate()
+# Initialize Spark session
+spark = SparkSession.builder \
+    .appName("Test Data Generation for Shipment Analysis") \
+    .getOrCreate()
 
-# Define schema for test data
-shipments_schema = StructType([
-    StructField("shipment_id", LongType(), False),
-    StructField("shipment_date", StringType(), True),
-    StructField("product_id", LongType(), False),
-    StructField("client_id", LongType(), False),
-    StructField("status", StringType(), False),
-    StructField("cancellation_flag", StringType(), False),
-    StructField("revenue", LongType(), False)
-])
+# Define schemas for testing
+shipments_schema = "shipment_id BIGINT, shipment_date TIMESTAMP, product_id BIGINT, client_id BIGINT, status STRING, cancellation_flag STRING, revenue BIGINT"
+clients_schema = "client_id BIGINT, client_name STRING"
 
-clients_schema = StructType([
-    StructField("client_id", LongType(), False),
-    StructField("client_name", StringType(), False)
-])
-
-# Generate test data for shipments
+# Generate test data for shipments table
 shipments_data = [
-    (1, '2024-01-15T00:00:00.000+0000', 101, 201, 'completed', 'Yes', 1000), # Valid completed shipment
-    (2, '2024-01-18T00:00:00.000+0000', 102, 202, 'completed', 'No', 2000),  # Valid not cancelled shipment
-    (3, '2024-02-20T00:00:00.000+0000', 103, 203, 'completed', 'yes', 1500), # Valid with lowercase cancellation flag
-    (4, '2024-02-22T00:00:00.000+0000', 104, None,   'completed', 'Yes', 1800), # Invalid with null client_id
-    (5, '2024-03-25T00:00:00.000+0000', 105, 205, 'partial', 'No', 1700),  # Partial shipment
-    (6, '2023-03-25T00:00:00.000+0000', 105, 205, 'completed', 'YES', 2100), # Valid with uppercase cancellation flag
-    (7, None, 106, 206, 'completed', 'No', 1800), # Null shipment_date
-    (8, 'invalid_date', 107, 207, 'completed', 'Yes', 1600), # Incorrect date format
-    (9, '2024-04-15T00:00:00.000+0000', 108, 208, 'completed', 'No', 1900), # Valid record
-    (10, '2024-04-18T00:00:00.000+0000', 109, 209, 'completed', 'Yes', 1200) # Valid record
+    # Happy path test data
+    (1, '2024-03-21T00:00:00.000+0000', 101, 1, 'Shipped', 'No', 5000),
+    (2, '2024-04-15T00:00:00.000+0000', 102, 2, 'Cancelled', 'Yes', 7000),
+    (3, '2024-04-20T00:00:00.000+0000', 103, 3, 'Shipped', 'No', 3000),
+    (4, '2024-05-05T00:00:00.000+0000', 104, 4, 'Cancelled', 'Yes', 8000),
+    
+    # Edge cases
+    (5, '2024-04-01T00:00:00.000+0000', 105, 5, 'Shipped', 'No', 9000),
+    (6, '2024-04-30T00:00:00.000+0000', 106, 6, 'Cancelled', 'Yes', 2000),
+    (7, '2024-02-29T00:00:00.000+0000', 107, 7, 'Shipped', 'No', 8500),
+
+    # Error cases
+    (8, '2024-04-10T00:00:00.000+0000', 108, None, 'Cancelled', 'Yes', 9500),  # NULL client_id
+    (9, 'invalid-date-format', 109, 5, 'Shipped', 'No', 10000),               # Invalid date format
+    (10, '2024-06-15T00:00:00.000+0000', 110, 9, 'Shipped', 'Maybe', 6000),   # Invalid cancellation_flag
+
+    # Special characters and multi-byte characters
+    (11, '2024-03-21T00:00:00.000+0000', 111, 10, 'Shipp€d', 'Nô', 4000),     # Special characters
+    (12, '2024-03-21T00:00:00.000+0000', 112, 11, '送货', '否', 7500)         # Multi-byte characters
 ]
 
-# Generate test data for clients
+# Generate test data for clients table
 clients_data = [
-    (201, 'Client A'),
-    (202, 'Client B'),
-    (203, 'Client C'),
-    (205, 'Client D'),
-    (206, 'Client E'),
-    (208, 'Client F')
+    (1, 'Client A'),
+    (2, 'Client B'),
+    (3, 'Client C'),
+    (4, 'Client D'),
+    (5, 'Client E'),
+    (6, 'Client F'),
+    (7, 'Client G'),
+    (8, 'Client H'),
+    (9, 'Client I'),
+    (10, 'Client J'),
+    (11, 'Client K')
 ]
 
-# Create DataFrames
+# Create DataFrames based on the schema and test data
 shipments_df = spark.createDataFrame(shipments_data, schema=shipments_schema)
 clients_df = spark.createDataFrame(clients_data, schema=clients_schema)
 
-# Process dataframe
-processed_shipments_df = shipments_df.filter(col("status") == "completed") \
-    .filter((col("shipment_date").isNotNull()) & (col("client_id").isNotNull())) \
-    .filter(~col("shipment_date").isin("None", "invalid_date"))
+# Validate and convert data types, handling invalid data gracefully
+try:
+    shipments_df = shipments_df.withColumn("shipment_date", 
+                                           when(col("shipment_date").cast("TIMESTAMP").isNotNull(), col("shipment_date"))
+                                           .otherwise(None))
+    shipments_df = shipments_df.withColumn("cancellation_flag",
+                                           when(col("cancellation_flag").isin("Yes", "No"), col("cancellation_flag"))
+                                           .otherwise(None))
+except Exception as e:
+    print(f"Error in data type validation: {e}")
 
-# Extract year and month from shipment_date, ignoring invalid and null dates
-processed_shipments_df = processed_shipments_df.withColumn("year", year("shipment_date")) \
-    .withColumn("month", month("shipment_date"))
+# Extract year and month based on shipment_date
+shipment_analysis_df = shipments_df \
+    .filter(col("client_id").isNotNull()) \
+    .filter(col("shipment_date").isNotNull()) \
+    .withColumn("year", year("shipment_date")) \
+    .withColumn("month", month("shipment_date")) \
+    .groupBy("client_id", "year", "month") \
+    .agg(
+        count(col("shipment_id")).alias("total_shipments"),
+        sum(when(col("cancellation_flag") == "Yes", 1).otherwise(0)).alias("cancelled_shipments")
+    ) \
+    .withColumn("cancellation_percentage",
+                round((col("cancelled_shipments") / col("total_shipments")) * 100, 2))
 
-# Calculate total shipments, cancelled shipments, and join with clients
-aggregated_shipments_df = processed_shipments_df.groupBy("client_id", "year", "month") \
-    .agg(count("*").alias("total_shipments"),
-         sum(when(col("cancellation_flag").isin("Yes", "yes", "YES"), 1).otherwise(0)).alias("cancelled_shipments"))
+# Join with clients table to get client_name
+shipment_analysis_df = shipment_analysis_df.join(clients_df, "client_id") \
+    .select("client_name", "year", "month", "total_shipments", "cancelled_shipments", "cancellation_percentage")
 
-result_df = aggregated_shipments_df.join(clients_df, "client_id", "inner") \
-    .select(
-        col("client_name"),
-        col("year"),
-        col("month"),
-        col("total_shipments"),
-        col("cancelled_shipments"),
-        (col("cancelled_shipments") / col("total_shipments") * 100).alias("cancellation_percentage")
-    )
+shipment_analysis_df.show()
 
-result_df.show(20)
-
-
-This code uses PySpark to generate test records, ensuring a variety of scenarios including valid, edge, and error cases. The data processing includes filtering for completed shipments, handling null and invalid dates, managing various cancellation flag formats, and joining with client data. Comments and considerations ensure that each scenario is appropriately addressed while maintaining consistency with Databricks data types and conventions.
