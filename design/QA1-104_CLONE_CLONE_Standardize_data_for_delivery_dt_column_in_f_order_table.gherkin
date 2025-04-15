@@ -1,0 +1,43 @@
+Feature: Data Standardization of Delivery Date
+
+  Background: Prepare the environment
+    Given a SQL file located at /Workspace/stg/scripts/f_order.sql
+    And using Unity Catalog purgo_databricks with Schema purgo_playground
+
+  Scenario: Verify if delivery_dt is in Decimal (38,0) format with yyyymmdd
+    Given the table purgo_playground.purgo_playground.f_order
+    When the delivery_dt field is extracted
+    Then the delivery_dt should be in Decimal (38,0) format
+    And the values should match the pattern yyyymmdd
+
+  Scenario Outline: Check invalid delivery_dt formats
+    Given the delivery_dt value "<delivery_dt_value>"
+    When converted to the target format
+    Then an error message "<error_message>" should be returned
+
+    Examples:
+      | delivery_dt_value | error_message                     |
+      | 2024-09-10        | "Invalid format: should be yyyymmdd" |
+      | 2024/09/10        | "Invalid format: should be yyyymmdd" |
+      | 20240910.5        | "Invalid decimal format"           |
+
+  Scenario: Validate conversion error conditions
+    Given the delivery_dt value is not in "yyyymmdd" format
+    When the conversion logic is applied
+    Then log an error "Conversion failed: Invalid source format"
+
+  Scenario: Validate correct values
+    Given the delivery_dt in table purgo_playground.purgo_playground.f_order
+    When queried for all entries
+    Then each delivery_dt should pass the format conversion
+
+  Scenario Outline: Data-driven tests for different delivery_dt inputs
+    Given the delivery_dt is "<input_value>"
+    When processed in the conversion pipeline
+    Then the resultant format should be "<expected_output>"
+
+    Examples:
+      | input_value | expected_output |
+      | 20240910    | 20240910        |
+      | 20231201    | 20231201        |
+      | 20230115    | 20230115        |
