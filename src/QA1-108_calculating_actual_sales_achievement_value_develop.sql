@@ -1,0 +1,54 @@
+/* Databricks SQL query to calculate actual sales value for each brand by country and territory */
+
+/* Joining sales tables and validating against control table */
+WITH SalesData AS (
+  SELECT 
+    itm.country_code,
+    itm.brand_name,
+    itm.territory_id,
+    date_part('month', itm.sales_month) AS sales_month,
+    date_part('year', itm.sales_month) AS sales_year,
+    itm.sales_value,
+    date_part('month', ttm.fiscal_date) AS fiscal_month,
+    date_part('year', ttm.fiscal_date) AS fiscal_year,
+    ttm.sales_net_price_local,
+    itm.source_system_name
+  FROM purgo_playground.t3_itm_territory_sales itm
+  INNER JOIN purgo_playground.t3_ttm_territory_sales ttm 
+    ON itm.country_code = ttm.country_code
+    AND itm.brand_name = ttm.brand_name
+    AND itm.territory_id = ttm.territory_id
+    AND date_part('month', itm.sales_month) = date_part('month', ttm.fiscal_date)
+    AND date_part('year', itm.sales_month) = date_part('year', ttm.fiscal_date)
+)
+
+/* Calculating actual_value for valid records */
+SELECT 
+  brand_name,
+  country_code,
+  territory_id,
+  SUM(sales_value + sales_net_price_local) AS actual_value
+FROM SalesData
+WHERE source_system_name IN (SELECT source_system FROM purgo_playground.control_table)
+GROUP BY brand_name, country_code, territory_id
+
+/* Handling mismatched date records for flagging */
+UNION ALL
+SELECT
+  brand_name,
+  country_code,
+  territory_id,
+  NULL AS actual_value
+FROM SalesData
+WHERE sales_month != fiscal_month OR sales_year != fiscal_year
+
+/* Exclusion of records with NULL fields */
+UNION ALL
+SELECT
+  brand_name,
+  country_code,
+  territory_id,
+  NULL AS actual_value
+FROM SalesData
+WHERE brand_name IS NULL OR country_code IS NULL 
+   OR territory_id IS NULL OR source_system_name IS NULL
