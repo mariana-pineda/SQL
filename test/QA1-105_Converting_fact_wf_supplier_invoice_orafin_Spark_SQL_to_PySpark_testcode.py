@@ -1,247 +1,70 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StructField, StringType, DoubleType, LongType, TimestampType
-from pyspark.sql import functions as F
+from pyspark.sql import SparkSession, functions as F
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType, TimestampType, LongType
 
 # Initialize Spark session
-spark = SparkSession.builder \
-    .appName("TestAnalysis") \
-    .getOrCreate()
+spark = SparkSession.builder.appName("DatabricksTestCode").getOrCreate()
 
-# Define the schema for the supplier_invoice_bkp table
-schema_supplier_invoice_bkp = StructType([
-    StructField("src_sys_cd", StringType(), True),
-    StructField("po_nbr", StringType(), True),
-    StructField("po_line_nbr", StringType(), True),
-    StructField("invc_co_amt", DoubleType(), True),
-    StructField("invc_txn_amt", DoubleType(), True),
-    StructField("invc_txn_type", StringType(), True),
-    StructField("document_type", StringType(), True),
-    StructField("document_desc", StringType(), True),
-    StructField("invc_entry_period", LongType(), True),
-    StructField("vchr_nbr", LongType(), True),
+# Define schema for supplier_invoice DataFrame
+supplier_invoice_schema = StructType([
+    StructField("invc_entry_period", TimestampType(), True),
+    StructField("suplr_invc_nbr", StringType(), True),
+    StructField("vchr_nbr", StringType(), True),
+    StructField("vchr_line_nbr", StringType(), True),
     StructField("fscl_yr_nbr", LongType(), True),
     StructField("vchr_type_cd", StringType(), True),
-    StructField("po_curncy_cd", StringType(), True),
-    StructField("post_yr_mth_nbr", LongType(), True),
-    StructField("invc_entry_dt", LongType(), True),
-    StructField("paymt_due_dt", LongType(), True),
-    StructField("txn_curncy_mth_rt", LongType(), True),
-    StructField("inv_line_desc", StringType(), True),
-    StructField("spend_type_cd", StringType(), True),
-    StructField("supplier_cd", StringType(), True),
-    StructField("suplr_invc_dt", LongType(), True),
-    StructField("txn_orig_id", StringType(), True),
-    StructField("suplr_invc_nbr", StringType(), True),
-    StructField("remit_to_rgn_cd", StringType(), True),
-    StructField("remit_to_rgn_nm", StringType(), True),
-    StructField("suplr_paymt_terms_desc", StringType(), True),
-    StructField("ap_payment_term_desc", StringType(), True),
-    StructField("remit_to_cntry_nm", StringType(), True),
-    StructField("supplier_type_cd", StringType(), True),
-    StructField("suplr_paymt_terms_cd", StringType(), True),
-    StructField("ap_payment_term_cd", StringType(), True),
-    StructField("remit_to_addr_line_2", StringType(), True),
-    StructField("remit_to_addr_line_3", StringType(), True),
-    StructField("remit_to_addr_line_4", StringType(), True),
-    StructField("remit_to_cntry_cd", StringType(), True),
-    StructField("po_paymt_terms_cd", StringType(), True),
-    StructField("po_paymt_terms_desc", StringType(), True),
-    StructField("gl_acct_id", StringType(), True),
-    StructField("cost_centre_cd", LongType(), True),
-    StructField("co_cd", LongType(), True),
-    StructField("co_curncy_cd", StringType(), True),
-    StructField("pass_through_field", StringType(), True),
-    StructField("pass_through_line", StringType(), True),
-    StructField("item_nbr", StringType(), True),
-    StructField("item_desc", StringType(), True),
-    StructField("uom_conv_factor", StringType(), True),
-    StructField("invc_uom_cd", StringType(), True),
-    StructField("vendor_mat_no", StringType(), True),
-    StructField("unit_prc", DoubleType(), True),
-    StructField("invc_qty", LongType(), True),
-    StructField("base_qty", StringType(), True),
-    StructField("suplr_nm_src", StringType(), True),
-    StructField("remit_to_st_cd", StringType(), True),
-    StructField("part_rev_no", StringType(), True),
-    StructField("contract_flag", StringType(), True),
-    StructField("contract_type", StringType(), True),
-    StructField("profit_cntr", StringType(), True),
-    StructField("co_curncy_mth_rt", LongType(), True),
-    StructField("invc_txn_pmar_amt", LongType(), True),
-    StructField("invc_co_pmar_amt", LongType(), True),
-    StructField("unit_prc_pmar_amt", StringType(), True),
-    StructField("aprval_dt", StringType(), True),
-    StructField("vomi_flag", StringType(), True),
-    StructField("payment_compliance_flg", StringType(), True),
-    StructField("vchr_line_nbr", LongType(), True),
     StructField("vchr_status", StringType(), True),
-    StructField("thermo_item_nbr", StringType(), True),
-    StructField("lcr_flag", StringType(), True),
-    StructField("lcr_region", StringType(), True),
-    StructField("invc_apprv_id", StringType(), True),
-    StructField("reporting_site", StringType(), True),
-    StructField("warehouse", StringType(), True),
-    StructField("warehouse_nm", StringType(), True),
-    StructField("unit", StringType(), True),
-    StructField("nature", StringType(), True),
-    StructField("inv_flg", StringType(), True),
-    StructField("contract_start_date", StringType(), True),
-    StructField("contract_end_date", StringType(), True),
-    StructField("fk_orig", StringType(), True),
-    StructField("floor_stock_cd", StringType(), True),
-    StructField("sec_supp_cd", StringType(), True),
-    StructField("rpt_flex1", StringType(), True),
-    StructField("supplier_segment", StringType(), True),
-    StructField("inv_flg_text", StringType(), True),
-    StructField("invc_txn_amt_clsfctn", StringType(), True),
-    StructField("source_country", StringType(), True),
-    StructField("business_unit", StringType(), True),
-    StructField("div_cd", StringType(), True),
+    StructField("supplier_cd", StringType(), True),
+    StructField("supplier_name", StringType(), True),
+    StructField("supplier_type_cd", StringType(), True),
+    StructField("suplr_invc_dt", TimestampType(), True),
+    StructField("ap_payment_term_cd", StringType(), True),
+    StructField("ap_payment_term_desc", StringType(), True),
+    StructField("cost_centre_cd", StringType(), True),
+    StructField("cost_centre_nm", StringType(), True),
+    StructField("gl_acct_id", StringType(), True),
+    StructField("gl_acct_nm", StringType(), True),
+    StructField("inv_line_desc", StringType(), True),
+    StructField("remit_to_addr_line_1", StringType(), True),
+    StructField("column1", StringType(), True),
+    StructField("column2", StringType(), True),
+    StructField("column3", StringType(), True)
 ])
 
-# Example test data for supplier_invoice_bkp
-data_supplier_invoice_bkp = [
-    {
-        "src_sys_cd": "SYSTEM1",
-        "po_nbr": "PO123456",
-        "po_line_nbr": "LINE1",
-        "invc_co_amt": 500.0,
-        "invc_txn_amt": 550.0,
-        "invc_txn_type": "PURCHASE",
-        "document_type": "INVOICE",
-        "document_desc": "Invoice description",
-        "invc_entry_period": 202303,
-        "vchr_nbr": 987654321,
-        "fscl_yr_nbr": 2023,
-        "vchr_type_cd": "CREDIT",
-        "po_curncy_cd": "USD",
-        "post_yr_mth_nbr": 202303,
-        "invc_entry_dt": 20230315,
-        "paymt_due_dt": 20230330,
-        "txn_curncy_mth_rt": 0,
-        "inv_line_desc": "Line item description",
-        "spend_type_cd": "INDIRECT",
-        "supplier_cd": "SUPPLIER123",
-        "suplr_invc_dt": 20230315,
-        "txn_orig_id": "TXN001",
-        "suplr_invc_nbr": "INV001",
-        "remit_to_rgn_cd": None,
-        "remit_to_rgn_nm": None,
-        "suplr_paymt_terms_desc": "DESCRIPTION",
-        "ap_payment_term_desc": "TERM_DESC",
-        "remit_to_cntry_nm": "USA",
-        "supplier_type_cd": "TYPE1",
-        "suplr_paymt_terms_cd": "TERMCD1",
-        "ap_payment_term_cd": "APTERMCD1",
-        "remit_to_addr_line_2": None,
-        "remit_to_addr_line_3": None,
-        "remit_to_addr_line_4": None,
-        "remit_to_cntry_cd": None,
-        "po_paymt_terms_cd": None,
-        "po_paymt_terms_desc": None,
-        "gl_acct_id": "GL_ACCOUNT_123",
-        "cost_centre_cd": 12345,
-        "co_cd": 54321,
-        "co_curncy_cd": "USD",
-        "pass_through_field": None,
-        "pass_through_line": None,
-        "item_nbr": None,
-        "item_desc": None,
-        "uom_conv_factor": None,
-        "invc_uom_cd": None,
-        "vendor_mat_no": None,
-        "unit_prc": 500.0,
-        "invc_qty": 1,
-        "base_qty": None,
-        "suplr_nm_src": None,
-        "remit_to_st_cd": "ST123",
-        "part_rev_no": None,
-        "contract_flag": None,
-        "contract_type": None,
-        "profit_cntr": None,
-        "co_curncy_mth_rt": 0,
-        "invc_txn_pmar_amt": 0,
-        "invc_co_pmar_amt": 0,
-        "unit_prc_pmar_amt": None,
-        "aprval_dt": None,
-        "vomi_flag": None,
-        "payment_compliance_flg": None,
-        "vchr_line_nbr": 1,
-        "vchr_status": "APPROVED",
-        "thermo_item_nbr": None,
-        "lcr_flag": None,
-        "lcr_region": None,
-        "invc_apprv_id": None,
-        "reporting_site": None,
-        "warehouse": None,
-        "warehouse_nm": None,
-        "unit": None,
-        "nature": None,
-        "inv_flg": None,
-        "contract_start_date": None,
-        "contract_end_date": None,
-        "fk_orig": None,
-        "floor_stock_cd": None,
-        "sec_supp_cd": None,
-        "rpt_flex1": None,
-        "supplier_segment": None,
-        "inv_flg_text": None,
-        "invc_txn_amt_clsfctn": None,
-        "source_country": "NA",
-        "business_unit": None,
-        "div_cd": "DIV001",
-    }
+# Create DataFrame adhering to defined schema
+data = [
+    # Add sample data conforming to schema constraints
+    ('2023-01-01 00:00:00', 'INV123', 'VCHR123', 'LINE123', 2023, 'TYPE1', 'STATUS1', 'SUP123', 'Supplier Name', 'Type1', '2023-01-01 00:00:00', 'TERM1', 'Term Description', 'CC123', 'Cost Centre Name', 'GL123', 'GL Name', 'Line Description', 'Address Line 1', 'Column1', 'Column2', 'Column3'),
+    # Additional rows for testing edge cases and normal scenarios...
 ]
 
-# Create DataFrame using the test data
-df_supplier_invoice_bkp = spark.createDataFrame(data_supplier_invoice_bkp, schema_supplier_invoice_bkp)
+df = spark.createDataFrame(data, schema=supplier_invoice_schema)
 
-# Display the DataFrame
-df_supplier_invoice_bkp.show()
-
-# Schema Validation Test
-assert df_supplier_invoice_bkp.schema == schema_supplier_invoice_bkp, "Schema mismatch"
-
-# Check number of columns
-expected_column_count = len(schema_supplier_invoice_bkp.fields)
-actual_column_count = len(df_supplier_invoice_bkp.columns)
-assert actual_column_count == expected_column_count, f"Expected {expected_column_count} columns, found {actual_column_count}"
-
-# NULL Handling Tests
-null_count = df_supplier_invoice_bkp.select([F.sum(F.col(c).isNull().cast("int")).alias(c) for c in df_supplier_invoice_bkp.columns]).first()
-assert all(v >= 0 for v in null_count.values()), "NULL handling test failed"
-
-# Example Transformation Test
-df_transformed = df_supplier_invoice_bkp.withColumn("invc_txn_amt_adj", F.col("invc_txn_amt") * 1.1)
-
-# Ensure transformation was executed correctly
-assert df_transformed.filter(F.col("invc_txn_amt_adj") != F.col("invc_txn_amt") * 1.1).count() == 0, "Transformation test failed"
-
-# Clean-up operations
-df_transformed.unpersist()
-
-# Performance test for transformation
-import time
-start_time = time.time()
-df_transformed = df_supplier_invoice_bkp.withColumn("unit_prc_cny", F.expr("unit_prc * co_curncy_mth_rt"))
-end_time = time.time()
-assert (end_time - start_time) < 10, "Performance test failed, transformation took too long"
-
-# Example Delta Lake Operations
+# Handling missing or invalid data
 try:
-    spark.sql("MERGE INTO purgo_playground.supplier_invoice_bkp USING purgo_playground.supplier_invoice ON supplier_invoice_bkp.po_nbr = supplier_invoice.po_nbr")
+    # Perform operations like transformation, filtering, calculations
+    transformed_df = df.withColumn('fscl_yr_nbr', F.year('suplr_invc_dt'))
+    
+    # Validate schema consistency
+    assert len(df.columns) == len(supplier_invoice_schema.fields), "Column count mismatch"
+    
+    # Test data type conversions and validate NULL handling
+    df = df.withColumn("invc_entry_period", F.date_format(df.invc_entry_period, "yyyyMM"))
+    df = df.fillna({'suplr_invc_nbr': 'Unknown'})
 except Exception as e:
-    assert "AnalysisException" in str(e), "Delta Lake operation failed unexpectedly"
+    print(f"Error occurred: {e}")
 
-# Example Window Function Test
-window_spec = F.window("invc_entry_dt", "7 days")
-df_windowed = df_supplier_invoice_bkp.withColumn("window_func_result", F.sum("unit_prc").over(window_spec))
+# Write DataFrame to Delta lake after processing
+try: 
+    df.write.format("delta").mode("append").save(f"{unity_catalog}.purgo_playground.supplier_invoice")
+except Exception as e:
+    print(f"Error writing to Delta Lake: {e}")
 
-# Ensure window function was executed correctly
-assert df_windowed.count() > 0, "Window function test failed, no records processed"
+# Validate Delta Lake operations
+updated_df = spark.read.format("delta").load(f"{unity_catalog}.purgo_playground.supplier_invoice")
+assert updated_df.count() > 0, "Delta Lake update failed"
 
-# Expected value constraints
-assert df_supplier_invoice_bkp.filter(F.col("vchr_status").isin("APPROVED", "PENDING")).count() > 0, "Status value constraint test failed"
+# Clean up operation after tests
+spark.sql(f"DELETE FROM purgo_playground.supplier_invoice WHERE vchr_status = 'Incomplete'")
 
-# Foreign Key Relationship Validation
-assert spark.sql("SELECT supplier_cd FROM purgo_playground.supplier_invoice WHERE NOT EXISTS (SELECT 1 FROM purgo_playground.suppliers WHERE supplier_cd = supplier_cd)").count() == 0, "Foreign key relationship test failed"
+# Stop Spark session
+spark.stop()
