@@ -1,0 +1,47 @@
+Feature: Masking last 4 digits of invoice numbers in d_product_revenue table
+
+  Background:
+    Given the Unity Catalog purgo_playground.d_product_revenue exists
+    And data backup procedures have been confirmed
+    And validation and testing criteria for masked data are established
+
+  Scenario: Create masked invoice_number in replica table
+    Given the table d_product_revenue_clone does not exist
+    When I create a replica of d_product_revenue table as d_product_revenue_clone
+    Then d_product_revenue_clone should have the same schema as d_product_revenue
+
+  Scenario Outline: Mask last 4 digits of invoice_number
+    Given the invoice_number "<original_invoice>"
+    When I apply masking logic using PySpark to mask last 4 digits
+    Then the invoice_number should be "<masked_invoice>"
+
+    Examples:
+      | original_invoice | masked_invoice  |
+      | 1234234534      | 123423****       |
+      | 9876543210      | 987654****       |
+
+  Scenario: Error when masking on non-string invoice_number
+    Given the invoice_number data type is not a string
+    When I attempt to perform masking
+    Then an error message should be "Invalid data type for invoice_number. Expected string."
+
+  Scenario: Validate masked data in d_product_revenue_clone
+    Given the masked invoice_number values are in place
+    When I query the replica table d_product_revenue_clone
+    Then all invoice_number values should conform to the masking format "******<last 4 digits masked>"
+
+  Scenario: Performance test for large data volume
+    Given the data volume exceeds 10 million rows
+    When I execute the masking logic
+    Then the processing time should not exceed 5 minutes
+
+  Scenario: Restoration after drop fails
+    Given the table d_product_revenue_clone was dropped
+    And backup files exist for restoration
+    When I trigger the restore process
+    Then d_product_revenue_clone should be restored successfully without data loss
+
+  Scenario: Error scenario for dropping non-existent table
+    Given the table d_product_revenue_clone does not exist
+    When I attempt to drop d_product_revenue_clone
+    Then an error message should be "Table d_product_revenue_clone does not exist."
