@@ -1,49 +1,49 @@
-Feature: Calculation of Applied Quantity (apl_qty) in Inventory Transactions
+Feature: Calculate Applied Quantity for Inventory Transactions
+  In order to manage and track inventory allocations effectively
+  As a user in the Life Sciences sector
+  I want to calculate applied quantity (apl_qty) based on specific transactional and cumulative fields
 
   Background:
-    Given the inventory transaction data is available in 'purgo_databricks' within the schema 'purgo_playground'
-    And the table 'f_inv_movmnt_apl_qty' contains columns txn_id, ref_txn_qty, cumulative_txn_qty, cumulative_ref_ord_sched_qty, ref_ord_sched_qty, prior_cumulative_txn_qty, prior_cumulative_ref_ord_sched_qty, apl_qty
+    Given the table "purgo_playground.purgo_playground.f_inv_movmnt_apl_qty" exists
+    And it contains transactional data fields
 
-  Scenario Outline: Calculate apl_qty for positive reference transaction quantities
+  Scenario Outline: Calculate Applied Quantity for Inventory Movements
+    Given the transaction data:
+      | txn_id | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty |
+      | <txn_id> | <ref_txn_qty> | <cumulative_txn_qty> | <cumulative_ref_ord_sched_qty> | <ref_ord_sched_qty> | <prior_cumulative_txn_qty> | <prior_cumulative_ref_ord_sched_qty> |
+    When I calculate apl_qty based on conditions
+    Then the calculated apl_qty should be <apl_qty>
+
+    Examples:
+      | txn_id | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty | apl_qty |
+      | 1      | 50.0        | 100.0              | 90.0                         | 50.0              | 40.0                     | 30.0                               | 50.0    |
+      | 2      | -10.0       | 80.0               | 70.0                         | 40.0              | 50.0                     | 45.0                               | -10.0   |
+      | 3      | 20.0        | 60.0               | 100.0                        | 30.0              | 30.0                     | 25.0                               | 20.0    |
+
+  Scenario: Condition 1 - ref_txn_qty > 0 and cumulative_txn_qty >= cumulative_ref_ord_sched_qty
     Given ref_txn_qty is greater than 0
     And cumulative_txn_qty is greater than or equal to cumulative_ref_ord_sched_qty
     When prior_cumulative_ref_ord_sched_qty is less than prior_cumulative_txn_qty
-    Then apl_qty should be set to <ref_ord_sched_qty> minus the difference between <prior_cumulative_txn_qty> and <prior_cumulative_ref_ord_sched_qty>
-    Examples:
-      | txn_id | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty |
-      | 1      | 50          | 100                | 90                          | 50               | 40                       | 30                                 |
+    Then set apl_qty to ref_ord_sched_qty minus difference between prior_cumulative_txn_qty and prior_cumulative_ref_ord_sched_qty
+    Otherwise, use ref_ord_sched_qty as apl_qty
 
-  Scenario: Fallback apl_qty to reference order when conditions are not met
-    Given ref_txn_qty is greater than 0
-    And cumulative_txn_qty is greater than or equal to cumulative_ref_ord_sched_qty
-    When prior_cumulative_ref_ord_sched_qty is not less than prior_cumulative_txn_qty
-    Then apl_qty should be set to ref_ord_sched_qty
-
-  Scenario Outline: Calculate apl_qty for cumulative ref order schedule higher than cumulative transaction
+  Scenario: Condition 2 - ref_txn_qty > 0 and cumulative_ref_ord_sched_qty >= cumulative_txn_qty
     Given ref_txn_qty is greater than 0
     And cumulative_ref_ord_sched_qty is greater than or equal to cumulative_txn_qty
     When prior_cumulative_ref_ord_sched_qty is greater than prior_cumulative_txn_qty
-    Then apl_qty should be set to <ref_txn_qty> minus the difference between <prior_cumulative_ref_ord_sched_qty> and <prior_cumulative_txn_qty>
-    Examples:
-      | txn_id | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty |
-      | 3      | 20          | 60                 | 100                         | 30               | 30                       | 25                                 |
+    Then set apl_qty to ref_txn_qty minus difference between prior_cumulative_ref_ord_sched_qty and prior_cumulative_txn_qty
+    Otherwise, use ref_txn_qty as apl_qty
 
-  Scenario: Fallback apl_qty to reference transaction when conditions are not met
-    Given ref_txn_qty is greater than 0
-    And cumulative_ref_ord_sched_qty is greater than or equal to cumulative_txn_qty
-    When prior_cumulative_ref_ord_sched_qty is not greater than prior_cumulative_txn_qty
-    Then apl_qty should be set to ref_txn_qty
-
-  Scenario Outline: Set apl_qty for negative reference transaction quantities
+  Scenario: Condition 3 - ref_txn_qty < 0 and cumulative_txn_qty != 0 and cumulative_ref_ord_sched_qty > 0
     Given ref_txn_qty is less than 0
     And cumulative_txn_qty is not equal to 0
     And cumulative_ref_ord_sched_qty is greater than 0
-    Then apl_qty should be set to ref_txn_qty
-    Examples:
-      | txn_id | ref_txn_qty | cumulative_txn_qty | cumulative_ref_ord_sched_qty | ref_ord_sched_qty | prior_cumulative_txn_qty | prior_cumulative_ref_ord_sched_qty |
-      | 2      | -10         | 80                 | 70                          | 40               | 50                       | 45                                 |
+    Then set apl_qty to ref_txn_qty
 
-  Scenario: Default condition for unset apl_qty
-    Given ref_txn_qty does not satisfy condition 1, 2, or 3
-    Then apl_qty should be set to NULL
+  Scenario: Default Condition - none of the above conditions met
+    Given none of the above conditions are met
+    Then set apl_qty to NULL
 
+  Scenario: Validate Error Conditions
+    Given invalid data types for fields
+    Then output error message "Invalid data format"
