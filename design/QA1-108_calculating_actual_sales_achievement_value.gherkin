@@ -1,0 +1,81 @@
+Feature: Calculate Actual Sales Value For Each Brand by Country and Territory
+
+  Background:
+    Given the tables purgo_playground.t3_itm_territory_sales and purgo_playground.t3_ttm_territory_sales
+    And the control table purgo_playground.control_table with valid source_systems
+
+  Scenario: Calculate actual sales value for valid records
+    Given a valid brand_name, country_code, and territory_id
+    And corresponding sales_month and fiscal_date
+    And valid source_system_name exists in the control_table
+    When I execute the SQL query
+    Then I should sum sales_value from t3_itm_territory_sales and sales_net_price_local from t3_ttm_territory_sales
+    And calculate actual_value for each brand_name, country_code, and territory_id
+
+  Scenario: Ignore records with invalid source_system_name
+    Given a brand_name record with source_system_name not in control_table
+    When I execute the SQL query
+    Then I should exclude the brand_name record from actual_value calculation
+
+  Scenario Outline: Validate calculation across multiple data points
+    Given brand_name "<brand>"
+    And country_code "<country>"
+    And territory_id "<territory>"
+    And sales_month "<sales_month>"
+    And fiscal_date "<fiscal_date>"
+    And source_system_name "<source_system>"
+    When I execute the SQL query
+    Then I should calculate the actual_value correctly if source_system exists in control_table
+    Examples:
+      | brand    | country | territory | sales_month | fiscal_date | source_system |
+      | BrandA   | US      | 101       | 2023-09-01  | 2023-09-01  | SystemA       |
+      | BrandB   | UK      | 102       | 2023-09-01  | 2023-09-01  | SystemB       |
+      | BrandC   | DE      | 103       | 2023-09-01  | 2023-09-01  | SystemC       |
+      | BrandD   | US      | 104       | 2023-09-01  | 2023-09-01  | SystemD       |
+
+  Scenario: Handle error when dates do not align
+    Given sales_month is different from fiscal_date for some records
+    When I execute the SQL query
+    Then I should flag these records for manual review
+    And output error message "Date mismatch: sales_month does not align with fiscal_date"
+
+  Scenario: Ensure proper data format and value handling
+    Given sales_value is in decimal format
+    And sales_net_price_local is in decimal format
+    When I execute the SQL query
+    Then ensure actual_value is calculated in decimal format
+
+  Scenario: Exclude records with missing or null fields
+    Given a record with null brand_name, country_code, territory_id, or source_system_name
+    When I execute the SQL query
+    Then I should exclude this record from actual_value calculation
+
+  Scenario Outline: Verify invalid data scenarios
+    Given invalid brand_name "<brand>"
+    And country_code "<country>"
+    And territory_id "<territory>"
+    And source_system_name "<source_system>"
+    When I execute the SQL query
+    Then I should not calculate actual_value
+    Examples:
+      | brand  | country | territory | source_system |
+      |        | US      | 105       | SystemE       |
+      | BrandE |         | 106       | SystemF       |
+      | BrandF | UK      |           | SystemG       |
+      | BrandG | DE      | 107       |               |
+
+  Scenario: Check for aggregation grouping
+    Given multiple sales values for the same brand_name, country_code, and territory_id
+    When I execute the SQL query
+    Then I should group and aggregate correctly to compute the actual_value
+
+  Scenario: Validate data integrity during calculation
+    Given valid input data from purgo_playground.t3_itm_territory_sales and purgo_playground.t3_ttm_territory_sales
+    When I execute the SQL query
+    Then I should maintain data integrity throughout the join and aggregation process
+
+  Scenario: Ensure SQL query follows acceptance criteria
+    Given the requirements for calculating actual_value
+    And valid data input
+    When I execute the SQL query
+    Then ensure the output matches expected results and follows acceptance criteria
