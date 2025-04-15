@@ -1,17 +1,11 @@
-from datetime import datetime
 from pyspark.sql import SparkSession
-from pyspark.sql.types import (
-    StructType, StructField, StringType, DoubleType, LongType, TimestampType, DecimalType
-)
-from pyspark.sql import functions as F
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType, BigIntType, TimestampType, DateType, BooleanType
 
 # Initialize Spark session
-spark = SparkSession.builder \
-    .appName("TestDataGeneration") \
-    .getOrCreate()
+spark = SparkSession.builder.appName("GenerateTestData").getOrCreate()
 
-# Schema for supplier_invoice_bkp
-schema_supplier_invoice_bkp = StructType([
+# Define schema for "supplier_invoice"
+supplier_invoice_schema = StructType([
     StructField("src_sys_cd", StringType(), True),
     StructField("po_nbr", StringType(), True),
     StructField("po_line_nbr", StringType(), True),
@@ -20,19 +14,19 @@ schema_supplier_invoice_bkp = StructType([
     StructField("invc_txn_type", StringType(), True),
     StructField("document_type", StringType(), True),
     StructField("document_desc", StringType(), True),
-    StructField("invc_entry_period", LongType(), True),
-    StructField("vchr_nbr", LongType(), True),
-    StructField("fscl_yr_nbr", LongType(), True),
+    StructField("invc_entry_period", BigIntType(), True),
+    StructField("vchr_nbr", BigIntType(), True),
+    StructField("fscl_yr_nbr", BigIntType(), True),
     StructField("vchr_type_cd", StringType(), True),
     StructField("po_curncy_cd", StringType(), True),
-    StructField("post_yr_mth_nbr", LongType(), True),
-    StructField("invc_entry_dt", LongType(), True),
-    StructField("paymt_due_dt", LongType(), True),
-    StructField("txn_curncy_mth_rt", LongType(), True),
+    StructField("post_yr_mth_nbr", BigIntType(), True),
+    StructField("invc_entry_dt", BigIntType(), True),
+    StructField("paymt_due_dt", BigIntType(), True),
+    StructField("txn_curncy_mth_rt", BigIntType(), True),
     StructField("inv_line_desc", StringType(), True),
     StructField("spend_type_cd", StringType(), True),
     StructField("supplier_cd", StringType(), True),
-    StructField("suplr_invc_dt", LongType(), True),
+    StructField("suplr_invc_dt", BigIntType(), True),
     StructField("txn_orig_id", StringType(), True),
     StructField("suplr_invc_nbr", StringType(), True),
     StructField("remit_to_rgn_cd", StringType(), True),
@@ -40,9 +34,9 @@ schema_supplier_invoice_bkp = StructType([
     StructField("suplr_paymt_terms_desc", StringType(), True),
     StructField("ap_payment_term_desc", StringType(), True),
     StructField("remit_to_cntry_nm", StringType(), True),
-    StructField("suppSupplier Type Cd", StringType(), True),
+    StructField("supplier_type_cd", StringType(), True),
     StructField("suplr_paymt_terms_cd", StringType(), True),
-    StructField("ap_paympentcd", StringType(), True),
+    StructField("ap_payment_term_cd", StringType(), True),
     StructField("remit_to_addr_line_2", StringType(), True),
     StructField("remit_to_addr_line_3", StringType(), True),
     StructField("remit_to_addr_line_4", StringType(), True),
@@ -50,8 +44,8 @@ schema_supplier_invoice_bkp = StructType([
     StructField("po_paymt_terms_cd", StringType(), True),
     StructField("po_paymt_terms_desc", StringType(), True),
     StructField("gl_acct_id", StringType(), True),
-    StructField("cost_centre_cd", LongType(), True),
-    StructField("co_cd", LongType(), True),
+    StructField("cost_centre_cd", BigIntType(), True),
+    StructField("co_cd", BigIntType(), True),
     StructField("co_curncy_cd", StringType(), True),
     StructField("pass_through_field", StringType(), True),
     StructField("pass_through_line", StringType(), True),
@@ -61,7 +55,7 @@ schema_supplier_invoice_bkp = StructType([
     StructField("invc_uom_cd", StringType(), True),
     StructField("vendor_mat_no", StringType(), True),
     StructField("unit_prc", DoubleType(), True),
-    StructField("invc_qty", LongType(), True),
+    StructField("invc_qty", BigIntType(), True),
     StructField("base_qty", StringType(), True),
     StructField("suplr_nm_src", StringType(), True),
     StructField("remit_to_st_cd", StringType(), True),
@@ -69,14 +63,14 @@ schema_supplier_invoice_bkp = StructType([
     StructField("contract_flag", StringType(), True),
     StructField("contract_type", StringType(), True),
     StructField("profit_cntr", StringType(), True),
-    StructField("co_curncy_mth_rt", LongType(), True),
-    StructField("invc_txn_pmar_amt", LongType(), True),
-    StructField("invc_co_pmar_amt", LongType(), True),
+    StructField("co_curncy_mth_rt", BigIntType(), True),
+    StructField("invc_txn_pmar_amt", BigIntType(), True),
+    StructField("invc_co_pmar_amt", BigIntType(), True),
     StructField("unit_prc_pmar_amt", StringType(), True),
     StructField("aprval_dt", StringType(), True),
     StructField("vomi_flag", StringType(), True),
     StructField("payment_compliance_flg", StringType(), True),
-    StructField("vchr_line_nbr", LongType(), True),
+    StructField("vchr_line_nbr", BigIntType(), True),
     StructField("vchr_status", StringType(), True),
     StructField("thermo_item_nbr", StringType(), True),
     StructField("lcr_flag", StringType(), True),
@@ -99,108 +93,24 @@ schema_supplier_invoice_bkp = StructType([
     StructField("invc_txn_amt_clsfctn", StringType(), True),
     StructField("source_country", StringType(), True),
     StructField("business_unit", StringType(), True),
-    StructField("div_cd", StringType(), True),
+    StructField("div_cd", StringType(), True)
 ])
 
-# Example test data generation
-data_supplier_invoice_bkp = [
-    {
-        "src_sys_cd": "SYSTEM1",
-        "po_nbr": "PO123456",
-        "po_line_nbr": "LINE1",
-        "invc_co_amt": 500.0,
-        "invc_txn_amt": 550.0,
-        "invc_txn_type": "PURCHASE",
-        "document_type": "INVOICE",
-        "document_desc": "Testing invoice description",
-        "invc_entry_period": 202303,
-        "vchr_nbr": 987654321,
-        "fscl_yr_nbr": 2023,
-        "vchr_type_cd": "CREDIT",
-        "po_curncy_cd": "USD",
-        "post_yr_mth_nbr": 202303,
-        "invc_entry_dt": 20230315,
-        "paymt_due_dt": 20230330,
-        "txn_curncy_mth_rt": 0,
-        "inv_line_desc": "Line item description",
-        "spend_type_cd": "INDIRECT",
-        "supplier_cd": "SUPPLIER123",
-        "suplr_invc_dt": 20230315,
-        "txn_orig_id": "TXN001",
-        "suplr_invc_nbr": "INV001",
-        "remit_to_rgn_cd": None,
-        "remit_to_rgn_nm": None,
-        "suplr_paymt_terms_desc": "DESCRIPTION",
-        "ap_payment_term_desc": "TERM_DESC",
-        "remit_to_cntry_nm": "USA",
-        "supplier_type_cd": "TYPE1",
-        "suplr_paymt_terms_cd": "TERMCD1",
-        "ap_payment_term_cd": "APTERMCD1",
-        "remit_to_addr_line_2": None,
-        "remit_to_addr_line_3": None,
-        "remit_to_addr_line_4": None,
-        "remit_to_cntry_cd": None,
-        "po_paymt_terms_cd": None,
-        "po_paymt_terms_desc": None,
-        "gl_acct_id": "GL_ACCOUNT_123",
-        "cost_centre_cd": 12345,
-        "co_cd": 54321,
-        "co_curncy_cd": "USD",
-        "pass_through_field": None,
-        "pass_through_line": None,
-        "item_nbr": None,
-        "item_desc": None,
-        "uom_conv_factor": None,
-        "invc_uom_cd": None,
-        "vendor_mat_no": None,
-        "unit_prc": 500.0,
-        "invc_qty": 1,
-        "base_qty": None,
-        "suplr_nm_src": None,
-        "remit_to_st_cd": "ST123",
-        "part_rev_no": None,
-        "contract_flag": None,
-        "contract_type": None,
-        "profit_cntr": None,
-        "co_curncy_mth_rt": 0,
-        "invc_txn_pmar_amt": 0,
-        "invc_co_pmar_amt": 0,
-        "unit_prc_pmar_amt": None,
-        "aprval_dt": None,
-        "vomi_flag": None,
-        "payment_compliance_flg": None,
-        "vchr_line_nbr": 1,
-        "vchr_status": "APPROVED",
-        "thermo_item_nbr": None,
-        "lcr_flag": None,
-        "lcr_region": None,
-        "invc_apprv_id": None,
-        "reporting_site": None,
-        "warehouse": None,
-        "warehouse_nm": None,
-        "unit": None,
-        "nature": None,
-        "inv_flg": None,
-        "contract_start_date": None,
-        "contract_end_date": None,
-        "fk_orig": None,
-        "floor_stock_cd": None,
-        "sec_supp_cd": None,
-        "rpt_flex1": None,
-        "supplier_segment": None,
-        "inv_flg_text": None,
-        "invc_txn_amt_clsfctn": None,
-        "source_country": "NA",
-        "business_unit": None,
-        "div_cd": "DIV001",
-    }
-    # Add more test cases here following similar structure for diverse data range
+# Generate 20-30 diverse test records
+test_data = [
+    ("usorafin", "PO123", "POLN1", 1500.05, 1500.05, "Invoice", "Type A", "Purchase order 123", 202403, 12345, 2024, "Type B", "USD", 202403, 20240321, 20240322, 1, "Line Description", "Indirect", "SUP123", 20240318, "TXN123", "INV123", None, "Region Name", "30 days", "Net 30", "Country Name", None, "30", None, None, None, "GL123", 123, 400, None, None, None, None, None, None, None, None, None, None, 0.0, 1, None, None, "State Code", None, None, None, None, None, None, None, None, None, None, None, None, None, 0, 0, None, None, None, None, 456, "Active", None, None, None, None, None, None, None, None, None, None, None, None, None, None, None),
+    # Add more records for edge cases, error cases, special characters, NULL handling...
 ]
 
-# Create DataFrame using test data
-df_supplier_invoice_bkp = spark.createDataFrame(data_supplier_invoice_bkp, schema_supplier_invoice_bkp)
+# Create DataFrame using the defined schema and test data
+test_df = spark.createDataFrame(test_data, schema=supplier_invoice_schema)
 
-# Show DataFrame
-df_supplier_invoice_bkp.show()
+# Save the DataFrame to the target location on Unity Catalog
+try:
+    test_df.write.format("delta").mode("overwrite").save("purgo_playground.purgo_playground.supplier_invoice")
+except Exception as e:
+    # Handle any errors during data writing
+    print(f"Error in writing data: {e}")
 
-# Note: Add additional DataFrame creation logic for other tables as needed following similar pattern.
+# Stop the Spark session
+spark.stop()
