@@ -1,0 +1,79 @@
+Feature: Conversion of Spark.SQL to PySpark code
+
+  Background:
+    Given Unity Catalog: purgo_databricks
+    And Unity Catalog Schema: purgo_playground
+
+  Scenario: Successful conversion of Spark.SQL to PySpark code
+    Given Spark.SQL code from fact_wf_supplier_invoice_orafin.ipynb notebook
+    When functions from Spark.SQL are identified and converted into PySpark equivalent
+    And PySpark code is configured to use the Unity Catalog tables
+    Then the conversion should replicate the functionality of the original Spark.SQL
+
+  Scenario Outline: Query specific table to validate data manipulation
+    Given PySpark code utilizing <table_name> as data source
+    When data is queried from <table_name> using PySpark
+    Then the retrieved data should match the expected format and values
+
+    Examples:
+      | table_name                          |
+      | supplier_invoice_bkp                |
+      | supplier_invoice                    |
+      | f_supplier_invoice                  |
+      | supplier_invoice_orig               |
+
+  Scenario: Error handling during conversion
+    Given Spark.SQL code that includes a function not whitelisted or unsupported in PySpark
+    When such a function is encountered
+    Then an error message "Function not supported in PySpark: <function_name>" is displayed
+
+  Scenario Outline: Validate successful data conversion
+    Given PySpark conversion code
+    When executed in the environment
+    Then data stored in <target_table_path> should conform to expected schema
+    And data integrity must be maintained without loss or corruption
+    
+    Examples:
+      | target_table_path                    |
+      | purgo_playground.supplier_invoice_bkp |
+      | purgo_playground.supplier_invoice    |
+
+  Scenario: Handling unknown data dependencies
+    Given Spark.SQL code with potential unknown dependencies
+    When the conversion begins
+    Then validate with project leads for any undiscovered dependencies
+
+  Scenario: Confirmation of source tables
+    Given listed source tables and their schema
+    When conversions are carried out
+    Then ensure the operations are applied to correct data sources
+
+  Scenario Outline: Validate schema conversion
+    Given a schema from Spark.SQL table <source_table>
+    When converted to PySpark
+    Then schema in PySpark must match the source table schema
+  
+    Examples:
+      | source_table                         |
+      | supplier_invoice_bkp                |
+      | supplier_invoice                    |
+
+  Scenario: Correct handling of partitioning setup
+    Given spark.conf for partitioning is set in Spark.SQL
+    When converted to PySpark
+    Then validate partitioning setup in PySpark matches Spark.SQL configuration
+
+  Scenario Outline: Aer error on Py4JSecurityException
+    Given PySpark execution with CommandContext method involved
+    When encountering Py4JSecurityException
+    Then output should inform of non-whitelisted method with context
+    
+    Examples:
+      | method_name                         |
+      | com.databricks.backend.common.rpc.CommandContext.toJson |
+
+  Scenario: Validate widgets usage in PySpark
+    Given Spark.SQL code utilizes dbutils.widgets.get()
+    When converted to PySpark
+    Then validate widgets retrieval correctly reflects necessary transformation parameters
+
