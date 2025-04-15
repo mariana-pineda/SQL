@@ -1,0 +1,46 @@
+Feature: Calculate month-wise shipment statistics
+
+  Background:
+    Given the Unity Catalog is configured as purgo_databricks
+    And the Unity Catalog Schema is purgo_playground
+    And tables purgo_playground.shipments and purgo_playground.clients are available
+
+  Scenario: Calculate shipment metrics per client per year and month
+    Given a user wants to calculate monthly shipment statistics
+    When the shipments data is processed to extract the year and month from shipment_date
+    And the data is grouped by client_id, year, and month
+    And total shipments and cancelled shipments are calculated per client
+    And the data is joined with clients table on client_id
+    Then select client_name, year, month, total_shipments, cancelled_shipments, and cancellation_percentage
+
+  Scenario: Handle null or incorrect shipment dates
+    Given shipment_date can be null or incorrectly formatted
+    When processing shipment dates
+    Then null or incorrect dates should be skipped in calculations
+    And a log entry should be recorded for skipped entries
+
+  Scenario: Handle inconsistent cancellation flags
+    Given cancellation_flag can have various values
+    When processing cancellation flags
+    Then only 'Yes', 'yes', or 'YES' should be considered valid cancellation flags
+    And other values should be treated as 'No'
+
+  Scenario: Handle missing or mismatched client IDs
+    Given shipments may have missing or mismatched client IDs
+    When joining shipment data with clients table
+    Then exclude records with unmatched client IDs from the output
+    And log these records for review
+
+  Scenario: Include only complete shipments
+    Given shipments can be partial or pending
+    When calculating total shipments
+    Then only completed shipments should be included
+
+  Scenario Outline: Calculate statistics with varying data
+    Given clients and shipments data is available
+    When processing data for <client_name> in <year> and <month>
+    Then calculate total <total_shipments>, cancelled <cancelled_shipments>, and cancellation percentage <cancellation_percentage> 
+    Examples:
+      | client_name | year | month | total_shipments | cancelled_shipments | cancellation_percentage |
+      | Client A    | 2023 | 01    | 100             | 10                  | 10.0                    |
+      | Client B    | 2023 | 02    | 200             | 40                  | 20.0                    |
