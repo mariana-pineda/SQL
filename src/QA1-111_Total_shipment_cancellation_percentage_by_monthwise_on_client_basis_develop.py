@@ -1,22 +1,21 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, year, month, count, sum, when, lit
+from pyspark.sql.functions import col, year, month, count, sum, when
 
-# Assuming the 'spark' session is available as per instructions
+# Assuming the 'spark' session is available
 
-# Read data from Unity Catalog tables
+# Create DataFrames for shipments and clients
 shipments_df = spark.table("purgo_playground.shipments")
 clients_df = spark.table("purgo_playground.clients")
 
-# Filter and process shipments data
-processed_shipments_df = shipments_df.filter(col("status") == lit("completed")) \
-    .filter(col("shipment_date").isNotNull() & col("client_id").isNotNull()) \
+# Process shipments data: filter completed shipments and valid dates
+processed_shipments_df = shipments_df.filter(col("status") == "completed") \
+    .filter((col("shipment_date").isNotNull()) & (col("client_id").isNotNull())) \
     .filter(~col("shipment_date").isin("None", "invalid_date"))
 
-# Extract year and month from the shipment_date
+# Extract year and month from shipment_date
 processed_shipments_df = processed_shipments_df.withColumn("year", year("shipment_date")) \
     .withColumn("month", month("shipment_date"))
 
-# Aggregate shipments data
+# Aggregate: calculate total and cancelled shipments
 aggregated_df = processed_shipments_df.groupBy("client_id", "year", "month") \
     .agg(count("shipment_id").alias("total_shipments"),
          sum(when(col("cancellation_flag").isin("Yes", "yes", "YES"), 1).otherwise(0)).alias("cancelled_shipments"))
@@ -35,6 +34,7 @@ result_df = aggregated_df.join(clients_df, "client_id", "inner") \
 # Display results
 result_df.show()
 
-# Validate results (use proper test framework in a real scenario)
-assert result_df.agg(sum("total_shipments")).first()[0] > 0, "Total shipments count should be greater than 0"
-
+# Test assertions
+assert result_df.agg(sum("total_shipments")).first()[0] == 5, "Total shipments count does not match"
+assert result_df.filter(col("client_name") == 'Client A').select("cancellation_percentage").first()[0] == 100.0, "Client A's cancellation percentage mismatch"
+assert result_df.filter(col("month") == 3).count() == 1, "Month 3 data should exist and be complete"
