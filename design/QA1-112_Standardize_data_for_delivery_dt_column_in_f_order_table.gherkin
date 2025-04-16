@@ -1,0 +1,42 @@
+Feature: Data Standardization for delivery_dt in f_order table
+  The final dataset must ensure that delivery_dt is 100% Decimal (38,0) in the format yyyymmdd.
+
+  Background:
+    Given the source table purgo_playground.purgo_playground.f_order exists
+    And the column delivery_dt is of datatype decimal(38,0)
+
+  Scenario: Validate and transform delivery_dt to Decimal (38,0) format yyyymmdd
+    Given delivery_dt exists in f_order table
+    When delivery_dt is extracted from the source system
+    Then delivery_dt must be transformed to Decimal (38,0) format yyyymmdd
+
+  Scenario Outline: Happy path for valid delivery_dt transformation
+    Given a valid delivery_dt with <source_timestamp>
+    When the SQL transformation logic is applied
+    Then delivery_dt should be stored as <target_decimal> in the target table
+  
+    Examples:
+      | source_timestamp  | target_decimal |
+      | 2024-09-10 00:00:00 | 20240910      |
+      | 2023-01-15 08:30:00 | 20230115      |
+      | 2022-12-31 23:59:59 | 20221231      |
+
+  Scenario Outline: Error scenario for invalid delivery_dt format
+    Given a non-date delivery_dt value <invalid_value>
+    When the SQL validation logic is executed
+    Then an error message "<error_message>" should be generated
+    
+    Examples:
+      | invalid_value | error_message                     |
+      | invalid_date  | "Error: delivery_dt is not a valid date" |
+      | NULL          | "Error: delivery_dt value is missing"   |
+
+  Scenario: Validate dependency on other tables
+    Given a dependency on vw_order_allocated_qty for order_nbr validation
+    When the SQL logic is implemented for f_order
+    Then it should ensure consistency with vw_order_allocated_qty order_nbr
+
+  Scenario: Validate business rules for delivery_dt conversion
+    Given business rules require delivery_dt in target table as Decimal (38,0)
+    When rules are checked during data standardization
+    Then transformation rules should align with business requirements
