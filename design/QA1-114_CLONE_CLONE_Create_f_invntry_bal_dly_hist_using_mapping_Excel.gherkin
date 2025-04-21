@@ -1,189 +1,79 @@
-Feature: Populate f_invntry_bal_dly_hist Table
+Feature: Populate f_invntry_bal_dly_hist Table with SQL Logic
 
   Background:
-    Given the Unity Catalog is set to "purgo_databricks"
-    And the target schema is "purgo_playground"
-    And the source tables are loaded as per the "Source" sheet
-    And the join conditions are defined as per the "Joins" sheet
-    And the field mappings are defined as per the "Data_map" sheet
+    Given the source tables are available in the purgo_playground schema
+    And the following data is present in the itemledgerentrieswopd table:
+      | item_no_ | location_code | posting_date | Expiration_Date | serial_no_ | lot_no_ | other_columns |
+      | ITEM001  | LOC001         | 20230401     | 20231231         | SN001      | LOT001  | ...           |
+    And the following data is present in the sap_master_data table:
+      | Item_No_ | no_ | other_columns |
+      | ITEM001  | NO001 | ...           |
+    And the following data is present in the item_qty_on_hand table:
+      | Item_No_ | location_code | qty_on_hand | other_columns |
+      | ITEM001  | LOC001         | 100.0       | ...           |
+    And the following data is present in the reservation_entry table:
+      | Item_No_ | location_code | reservation_status | source_type | quantity_base | other_columns |
+      | ITEM001  | LOC001         | 0                  | 37          | -50.0         | ...           |
+    And the following data is present in the Itemwopd table:
+      | no_   | Standard_Cost | other_columns |
+      | NO001 | 10.5           | ...           |
 
   Scenario Outline: Successfully populate f_invntry_bal_dly_hist with valid data
-    Given the source table "<Source_Table>" contains valid records
-    When the SQL transformation logic is executed
-    Then the f_invntry_bal_dly_hist table should include a record with:
-      | Field                         | Value                                    |
-      | co_key                        | "nav_ger" + "1050"                        |
-      | g_account                     | "<g_account>"                            |
-      | g_assignment_type             | "Account"                                |
-      | g_capture_dt_yyyymmdd         | "<g_capture_dt_yyyymmdd>"                |
-      | g_company_cd                  | "1050"                                   |
-      | g_company_currency_cd         | "EUR"                                    |
-      | g_dnsa_dt_yyyymmdd            | "<g_dnsa_dt_yyyymmdd>"                   |
-      | g_expiration_dt_yyyymmdd      | "<g_expiration_dt_yyyymmdd>"             |
-      | g_item_nbr                    | "<g_item_nbr>"                           |
-      | g_location_cd                 | "<g_location_cd>"                        |
-      | g_location_status_cd          | "none"                                   |
-      | g_lot_effective_dt_yyyymmdd   | "<g_lot_effective_dt_yyyymmdd>"          |
-      | g_lot_nbr                     | "<g_lot_nbr>"                            |
-      | g_lot_status_cd               | "none"                                   |
-      | g_plant_cd                    | "CAGER"                                  |
-      | g_qty_allocated               | "<g_qty_allocated>"                      |
-      | g_qty_available               | "<g_qty_available>"                      |
-      | g_qty_financial_nettable      | "<g_qty_financial_nettable>"             |
-      | g_qty_in_transit              | NULL                                     |
-      | g_qty_mrp_nettable            | "<g_qty_mrp_nettable>"                   |
-      | g_qty_on_hand                 | "<g_qty_on_hand>"                        |
-      | g_qty_shippable               | "<g_qty_shippable>"                      |
-      | g_source_system_cd            | "nav_ger"                                |
-      | g_unit_cost_company_currency  | "<g_unit_cost_company_currency>"         |
-      | plant_key                     | "nav_ger" + "CAGER"                       |
-      | plant_location_key            | "nav_ger" + "CAGER" + "<g_location_cd>"   |
-      | prod_key                      | "nav_ger" + "<g_item_nbr>"                |
-      | prod_plant_key                | "nav_ger" + "<g_item_nbr>" + "CAGER"      |
-      | prod_plant_location_key       | "nav_ger" + "<g_item_nbr>" + "CAGER" + "<g_location_cd>" |
-      | prod_plant_lot_key            | "nav_ger" + "<g_item_nbr>" + "CAGER" + "<g_lot_nbr>" |
-      | prod_plant_lot_location_key   | "nav_ger" + "<g_item_nbr>" + "CAGER" + "<g_lot_nbr>" + "<g_location_cd>" |
-    And all data quality rules are satisfied
-
+    When the SQL logic for f_invntry_bal_dly_hist is executed
+    Then a new record should be created in f_invntry_bal_dly_hist with the following values:
+      | co_key                      | g_account | g_assignment_type | g_capture_dt_yyyymmdd | g_company_cd | g_company_currency_cd | g_dnsa_dt_yyyymmdd | g_expiration_dt_yyyymmdd | g_item_nbr | g_location_cd | g_location_status_cd | g_lot_effective_dt_yyyymmdd | g_lot_nbr | g_lot_status_cd | g_plant_cd | g_qty_allocated | g_qty_available | g_qty_financial_nettable | g_qty_in_transit | g_qty_mrp_nettable | g_qty_on_hand | g_qty_shippable | g_source_system_cd | g_unit_cost_company_currency | plant_key         | plant_location_key           | prod_key         | prod_plant_key     | prod_plant_location_key             | prod_plant_lot_key           | prod_plant_lot_location_key                 |
+      | <co_key>                    | <g_account> | <g_assignment_type> | <g_capture_dt_yyyymmdd> | <g_company_cd> | <g_company_currency_cd> | <g_dnsa_dt_yyyymmdd> | <g_expiration_dt_yyyymmdd> | <g_item_nbr> | <g_location_cd> | <g_location_status_cd> | <g_lot_effective_dt_yyyymmdd> | <g_lot_nbr> | <g_lot_status_cd> | <g_plant_cd> | <g_qty_allocated> | <g_qty_available> | <g_qty_financial_nettable> | <g_qty_in_transit> | <g_qty_mrp_nettable> | <g_qty_on_hand> | <g_qty_shippable> | <g_source_system_cd> | <g_unit_cost_company_currency> | <plant_key>       | <plant_location_key>         | <prod_key>       | <prod_plant_key>   | <prod_plant_location_key>           | <prod_plant_lot_key>         | <prod_plant_lot_location_key>                   |
     Examples:
-      | Source_Table               | g_account | g_capture_dt_yyyymmdd | g_dnsa_dt_yyyymmdd | g_expiration_dt_yyyymmdd | g_item_nbr | g_location_cd | g_lot_nbr | g_qty_allocated | g_qty_available | g_qty_financial_nettable | g_qty_mrp_nettable | g_qty_on_hand | g_qty_shippable | g_unit_cost_company_currency |
-      | sap_master_data            | ACC001    | 20240427              | 20240501            | 99991231                 | ITEM1001   | LOC01         | LOT123    | 10.5            | 20.0            | 15.0                      | 18.0               | 25.0          | 5.0              | 50.75                        |
-      | itemledgerentrieswopd      | ACC002    | 20240428              | 20240502            | 99991231                 | ITEM1002   | LOC02         | LOT124    | -5.0            | 30.0            | 25.0                      | 28.0               | 35.0          | 10.0             | 60.50                        |
+      | co_key   | g_account | g_assignment_type | g_capture_dt_yyyymmdd | g_company_cd | g_company_currency_cd | g_dnsa_dt_yyyymmdd | g_expiration_dt_yyyymmdd | g_item_nbr | g_location_cd | g_location_status_cd | g_lot_effective_dt_yyyymmdd | g_lot_nbr | g_lot_status_cd | g_plant_cd | g_qty_allocated | g_qty_available | g_qty_financial_nettable | g_qty_in_transit | g_qty_mrp_nettable | g_qty_on_hand | g_qty_shippable | g_source_system_cd | g_unit_cost_company_currency | plant_key        | plant_location_key          | prod_key        | prod_plant_key    | prod_plant_location_key             | prod_plant_lot_key          | prod_plant_lot_location_key                    |
+      | nav_ger1050 | ACCOUNT   | Account            | 20230401               | 1050         | EUR                   | 20231231           | 99991231               | ITEM001   | LOC001         | none                | 19000101                   | LOT001   | none            | CAGER      | -50.0           | 100.0            | 100.0                     | NULL             | 100.0                | 100.0         | 100.0           | nav_ger           | 10.5                          | nav_gerCAGER   | nav_gerCAGERLOC001           | nav_gerITEM001  | nav_gerITEM001CAGER | nav_gerITEM001CAGERLOC001           | nav_gerITEM001CAGERLOT001    | nav_gerITEM001CAGERLOT001LOC001              |
+
+  Scenario Outline: Fail to populate f_invntry_bal_dly_hist due to invalid g_company_currency_cd
+    Given the source table item_qty_on_hand contains a record with invalid g_company_currency_cd
+      | Item_No_ | location_code | qty_on_hand | other_columns |
+      | ITEM002  | LOC002         | 200.0       | ...           |
+    When the SQL logic for f_invntry_bal_dly_hist is executed
+    Then the record should not be created in f_invntry_bal_dly_hist
+    And an error message "Invalid g_company_currency_cd: <invalid_currency>" should be logged
+    Examples:
+      | invalid_currency |
+      | USDX             |
+      | 123              |
 
   Scenario Outline: Populate f_invntry_bal_dly_hist with default values when fields are missing
-    Given the source table "<Source_Table>" contains records with missing fields
-    When the SQL transformation logic is executed
-    Then the f_invntry_bal_dly_hist table should include a record with:
-      | Field                  | Value                                |
-      | co_key                 | "nav_ger" + "1050"                    |
-      | g_account              | "<g_account>"                        |
-      | g_assignment_type      | "Account"                            |
-      | g_capture_dt_yyyymmdd  | current_date                          |
-      | g_company_cd           | "1050"                               |
-      | g_company_currency_cd  | "EUR"                                |
-      | g_dnsa_dt_yyyymmdd     | "<g_dnsa_dt_yyyymmdd>"               |
-      | g_expiration_dt_yyyymmdd | "99991231"                          |
-      | g_item_nbr             | "<g_item_nbr>"                       |
-      | g_location_cd          | "<g_location_cd>"                    |
-      | g_location_status_cd   | "none"                               |
-      | g_lot_effective_dt_yyyymmdd | "19000101"                      |
-      | g_lot_nbr              | "none"                                |
-      | g_lot_status_cd        | "none"                               |
-      | g_plant_cd             | "CAGER"                              |
-      | g_qty_allocated        | "<g_qty_allocated>"                  |
-      | g_qty_available        | "<g_qty_available>"                  |
-      | g_qty_financial_nettable | "<g_qty_financial_nettable>"        |
-      | g_qty_in_transit       | NULL                                 |
-      | g_qty_mrp_nettable     | "<g_qty_mrp_nettable>"               |
-      | g_qty_on_hand          | "<g_qty_on_hand>"                    |
-      | g_qty_shippable        | "<g_qty_shippable>"                  |
-      | g_source_system_cd     | "nav_ger"                            |
-      | g_unit_cost_company_currency | "<g_unit_cost_company_currency>" |
-      | plant_key              | "nav_ger" + "CAGER"                   |
-      | plant_location_key     | "nav_ger" + "CAGER" + "<g_location_cd>" |
-      | prod_key               | "nav_ger" + "<g_item_nbr>"            |
-      | prod_plant_key         | "nav_ger" + "<g_item_nbr>" + "CAGER"  |
-      | prod_plant_location_key | "nav_ger" + "<g_item_nbr>" + "CAGER" + "<g_location_cd>" |
-      | prod_plant_lot_key     | "nav_ger" + "<g_item_nbr>" + "CAGER" + "none" |
-      | prod_plant_lot_location_key | "nav_ger" + "<g_item_nbr>" + "CAGER" + "none" + "<g_location_cd>" |
-    And all missing fields are populated with default values
+    Given the source tables contain records with missing fields
+      | item_no_ | location_code | posting_date | Expiration_Date | serial_no_ | lot_no_ | other_columns |
+      | ITEM003  | LOC003         | 20230501     | 20240101         |           |         | ...           |
+    When the SQL logic for f_invntry_bal_dly_hist is executed
+    Then a new record should be created in f_invntry_bal_dly_hist with default values:
+      | g_assignment_type | g_company_cd | g_company_currency_cd | g_location_status_cd | g_lot_status_cd | g_plant_cd | g_qty_allocated | g_qty_available | g_qty_financial_nettable | g_source_system_cd |
+      | Account            | 1050         | EUR                   | none                 | none            | CAGER      | <g_qty_allocated> | <g_qty_available> | <g_qty_financial_nettable> | nav_ger           |
+    And the following fields should be hardcoded:
+      | g_assignment_type | g_company_cd | g_company_currency_cd | g_location_status_cd | g_lot_status_cd | g_plant_cd | g_source_system_cd |
+      | Account            | 1050         | EUR                   | none                 | none            | CAGER      | nav_ger           |
 
+  Scenario Outline: Validate date formats in f_invntry_bal_dly_hist
+    Given the source tables contain records with dates in incorrect format
+      | item_no_ | location_code | posting_date | Expiration_Date | other_columns |
+      | ITEM004  | LOC004         | 2023-13-01    | 2024-02-30         | ...           |
+    When the SQL logic for f_invntry_bal_dly_hist is executed
+    Then the record should not be created in f_invntry_bal_dly_hist
+    And an error message "Invalid date format for posting_date or Expiration_Date" should be logged
     Examples:
-      | Source_Table          | g_account | g_dnsa_dt_yyyymmdd | g_item_nbr | g_location_cd | g_qty_allocated | g_qty_available | g_qty_financial_nettable | g_qty_mrp_nettable | g_qty_on_hand | g_qty_shippable | g_unit_cost_company_currency |
-      | sap_master_data       | ACC003    | 20240503            | ITEM1003   |                 | 0.0              | 0.0              | 0.0                        | 0.0                 | 0.0            | 0.0              | 55.00                        |
-      | itemledgerentrieswopd | ACC004    |                     | ITEM1004   | LOC04         | 5.0              | 10.0             | 7.5                        | 9.0                 | 12.0           | 3.0              | 65.25                        |
+      | posting_date | Expiration_Date |
+      | 2023-13-01    | 2024-02-30         |
+      | 2023/04/01    | 9999-99-99         |
 
-  Scenario Outline: Handle data validation errors during population of f_invntry_bal_dly_hist
-    Given the source table "<Source_Table>" contains records with invalid data
-    When the SQL transformation logic is executed
-    Then the process should fail with error "<Error_Message>"
-    And no records should be inserted into f_invntry_bal_dly_hist
+  Scenario Outline: Handle null values in g_qty_in_transit
+    Given the source tables contain a record with null g_qty_in_transit
+      | item_no_ | location_code | qty_in_transit | other_columns |
+      | ITEM005  | LOC005         | NULL            | ...           |
+    When the SQL logic for f_invntry_bal_dly_hist is executed
+    Then the g_qty_in_transit field in f_invntry_bal_dly_hist should be set to NULL
 
-    Examples:
-      | Source_Table          | Error_Message                                      |
-      | sap_master_data       | "g_account cannot be null or empty"                |
-      | itemledgerentrieswopd | "g_capture_dt_yyyymmdd must be a valid date"        |
-      | reservation_entry     | "g_qty_allocated must be a decimal number"          |
-      | item_qty_on_hand      | "g_company_currency_cd must follow ISO 4217 format" |
-
-  Scenario: Ensure uniqueness of g_item_nbr within the system
-    Given the source tables contain multiple records with the same g_item_nbr
-    When the SQL transformation logic is executed
-    Then the f_invntry_bal_dly_hist table should contain only unique g_item_nbr values
-    And duplicate records should be discarded or handled as per business rules
-
-  Scenario: Validate join conditions are correctly applied
-    Given the source tables have records that meet the join conditions
-    When the SQL transformation logic is executed
-    Then the records in f_invntry_bal_dly_hist should correctly reflect the joined data based on:
-      | Join Condition                                                                                                  |
-      | trim(itemledgerentrieswopd.item_no_) = trim(item_qty_on_hand.Item_No_)                                          |
-      | trim(itemledgerentrieswopd.location_code) = trim(item_qty_on_hand.location_code)                              |
-      | trim(itemledgerentrieswopd.item_no_) = trim(reservation_entry.Item_No_) and trim(itemledgerentrieswopd.location_code) = trim(reservation_entry.location_code) |
-      | trim(itmldgentrywopd.item_no_) = trim(rsrv_entry.Item_No_) and trim(itmldgentrywopd.location_code) = trim(rsrv_entry.location_code) |
-
-  Scenario: Verify hardcoded and derived fields are correctly populated
-    Given the source data is available for processing
-    When the SQL transformation logic is executed
-    Then the following fields should be populated as per specifications:
-      | Field                       | Expected Value                             |
-      | g_assignment_type           | "Account"                                  |
-      | g_company_cd                | "1050"                                     |
-      | g_company_currency_cd       | "EUR"                                      |
-      | g_source_system_cd          | "nav_ger"                                  |
-      | plant_key                   | "nav_ger1050"                              |
-      | plant_location_key          | "nav_ger1050" + "<g_location_cd>"          |
-      | prod_key                    | "nav_ger" + "<g_item_nbr>"                  |
-      | prod_plant_key              | "nav_ger" + "<g_item_nbr>" + "CAGER"        |
-      | prod_plant_location_key     | "nav_ger" + "<g_item_nbr>" + "CAGER" + "<g_location_cd>" |
-      | prod_plant_lot_key          | "nav_ger" + "<g_item_nbr>" + "CAGER" + "<g_lot_nbr>" |
-      | prod_plant_lot_location_key | "nav_ger" + "<g_item_nbr>" + "CAGER" + "<g_lot_nbr>" + "<g_location_cd>" |
-      | g_qty_in_transit            | NULL                                       |
-
-  Scenario Outline: Validate date fields format in f_invntry_bal_dly_hist
-    Given the source table "<Source_Table>" has date fields
-    When the SQL transformation logic is executed
-    Then the date fields in f_invntry_bal_dly_hist should follow the "YYYYMMDD" format
-      | Field                  | Expected Format |
-      | g_capture_dt_yyyymmdd  | YYYYMMDD         |
-      | g_dnsa_dt_yyyymmdd     | YYYYMMDD         |
-      | g_expiration_dt_yyyymmdd | YYYYMMDD       |
-      | g_lot_effective_dt_yyyymmdd | YYYYMMDD   |
-    And invalid date formats should trigger validation errors
-
-    Examples:
-      | Source_Table          |
-      | sap_master_data       |
-      | itemledgerentrieswopd |
-
-  Scenario Outline: Ensure currency codes adhere to ISO 4217 standards
-    Given the source table "<Source_Table>" provides currency codes
-    When the SQL transformation logic is executed
-    Then the g_company_currency_cd field in f_invntry_bal_dly_hist should only contain valid ISO 4217 codes
-    And invalid currency codes should trigger an error "<Error_Message>"
-
-    Examples:
-      | Source_Table          | Error_Message                             |
-      | sap_master_data       | "g_company_currency_cd must be a valid ISO 4217 code" |
-      | itemledgerentrieswopd | "Invalid currency code in g_company_currency_cd"  |
-
-  Scenario: Handle NULL values appropriately
-    Given the source tables provide records with NULL values for non-mandatory fields
-    When the SQL transformation logic is executed
-    Then the f_invntry_bal_dly_hist table should represent NULLs accurately as per specifications
-    And default values should be applied where necessary
-
-  Scenario: Verify hardcoded values are consistent across records
-    Given multiple records are processed from the source tables
-    When the SQL transformation logic is executed
-    Then the following fields should consistently contain hardcoded values:
-      | Field                  | Hardcoded Value |
-      | g_assignment_type      | "Account"        |
-      | g_company_cd           | "1050"           |
-      | g_company_currency_cd  | "EUR"            |
-      | g_source_system_cd     | "nav_ger"        |
-      | g_location_status_cd   | "none"           |
-      | g_lot_status_cd        | "none"           |
-      | g_plant_cd             | "CAGER"          |
-      | g_qty_in_transit       | NULL             |
- 
+  Scenario Outline: Ensure concatenated keys are correctly formed
+    When the SQL logic for f_invntry_bal_dly_hist is executed with the following source data:
+      | source_system_cd | g_company_cd | g_plant_cd | g_location_cd | g_item_nbr | g_lot_nbr |
+      | nav_ger          | 1050         | CAGER      | LOC006         | ITEM006    | LOT006    |
+    Then the concatenated fields should be:
+      | plant_key                     | plant_location_key                             | prod_key                   | prod_plant_key             | prod_plant_location_key                   | prod_plant_lot_key                 | prod_plant_lot_location_key                         |
+      | nav_gerCAGER                  | nav_gerCAGERLOC006                             | nav_gerITEM006             | nav_gerITEM006CAGER        | nav_gerITEM006CAGERLOC006                | nav_gerITEM006CAGERLOT006          | nav_gerITEM006CAGERLOT006LOC006                    |
