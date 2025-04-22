@@ -1,70 +1,99 @@
-# """
-# PySpark Script to Mask the Last 4 Digits of Invoice Number in purgo_playground.d_product_revenue_clone
-# 
-# Steps:
-# 1. Drop the clone table if it exists.
-# 2. Clone the original d_product_revenue table to d_product_revenue_clone.
-# 3. Mask the last 4 digits of invoice_number with '*' in the clone table.
-# """
+# /*
+# PySpark Script to Mask the Last Four Digits of invoice_number in d_product_revenue_clone Table
+# This script performs the following operations:
+# 1. Drops the clone table if it exists.
+# 2. Clones the original d_product_revenue table to d_product_revenue_clone.
+# 3. Applies masking to the last four digits of the invoice_number column.
+# 4. Validates schema consistency and handles errors gracefully.
+# */
 
-from pyspark.sql.functions import col, when, concat, lit, substring, length
+from pyspark.sql.functions import col, when, length, substring, concat, lit
 
-# /* Drop the clone table if it exists */
 try:
+    # /* 
+    # Drop the clone table if it exists 
+    # */
     spark.sql("""
         DROP TABLE IF EXISTS purgo_databricks.purgo_playground.d_product_revenue_clone
     """)
 except Exception as e:
-    # Handle exception during drop operation
-    raise RuntimeError(f"Failed to drop clone table: {e}")
+    # /* 
+    # Log error if dropping the table fails 
+    # */
+    raise Exception(f"Failed to drop clone table: {e}")
 
-# /* Clone the original d_product_revenue table */
 try:
+    # /* 
+    # Clone the original d_product_revenue table to d_product_revenue_clone 
+    # */
     spark.sql("""
         CREATE TABLE purgo_databricks.purgo_playground.d_product_revenue_clone
         AS SELECT * FROM purgo_databricks.purgo_playground.d_product_revenue
     """)
 except Exception as e:
-    # Handle exception during cloning
-    raise RuntimeError(f"Failed to clone table: {e}")
+    # /* 
+    # Log error if cloning the table fails 
+    # */
+    raise Exception(f"Failed to clone table: {e}")
 
-# /* Read the cloned table into a DataFrame */
 try:
+    # /* 
+    # Read the cloned table into a DataFrame 
+    # */
     df_clone = spark.table("purgo_databricks.purgo_playground.d_product_revenue_clone")
 except Exception as e:
-    # Handle exception during table read
-    raise RuntimeError(f"Failed to read clone table: {e}")
+    # /* 
+    # Log error if reading the clone table fails 
+    # */
+    raise Exception(f"Failed to read clone table: {e}")
 
-# /* Mask the last 4 digits of invoice_number */
 try:
+    # /*
+    # Apply masking to the last four digits of invoice_number
+    # Replace last four digits with '****' if invoice_number has at least four digits
+    # Otherwise, replace the entire invoice_number with '****'
+    # */
     df_masked = df_clone.withColumn(
         "invoice_number",
         when(
-            (col("invoice_number").isNotNull()) & (length(col("invoice_number").cast("string")) > 4),
+            length(col("invoice_number").cast("string")) >= 4,
             concat(
                 substring(col("invoice_number").cast("string"), 1, length(col("invoice_number").cast("string")) - 4),
                 lit("****")
             )
-        ).otherwise(col("invoice_number").cast("string"))
+        ).otherwise(lit("****"))
     )
 except Exception as e:
-    # Handle exception during masking
-    raise RuntimeError(f"Failed to mask invoice_number: {e}")
+    # /* 
+    # Log error if masking fails 
+    # */
+    raise Exception(f"Failed to apply masking to invoice_number: {e}")
 
-# /* Validate the number of columns matches the original schema */
 try:
-    original_df = spark.table("purgo_databricks.purgo_playground.d_product_revenue")
-    if len(df_masked.columns) != len(original_df.columns):
-        raise ValueError("Column count mismatch after masking.")
+    # /*
+    # Validate that the number of columns matches the target table's schema
+    # */
+    original_schema = spark.table("purgo_databricks.purgo_playground.d_product_revenue_clone").schema
+    masked_schema = df_masked.schema
+    if len(original_schema) != len(masked_schema):
+        raise Exception("Column count mismatch after masking")
+    
+    for orig_field, masked_field in zip(original_schema, masked_schema):
+        if orig_field.name != masked_field.name or orig_field.dataType != masked_field.dataType:
+            raise Exception(f"Schema mismatch on column {orig_field.name}")
 except Exception as e:
-    # Handle exception during validation
-    raise RuntimeError(f"Schema validation failed: {e}")
+    # /* 
+    # Log error if schema validation fails 
+    # */
+    raise Exception(f"Schema validation failed: {e}")
 
-# /* Overwrite the clone table with the masked DataFrame */
 try:
+    # /* 
+    # Overwrite the clone table with the masked DataFrame 
+    # */
     df_masked.write.mode("overwrite").saveAsTable("purgo_databricks.purgo_playground.d_product_revenue_clone")
 except Exception as e:
-    # Handle exception during write operation
-    raise RuntimeError(f"Failed to write masked data to clone table: {e}")
-
-# /* End of masking process */
+    # /* 
+    # Log error if writing the masked DataFrame fails 
+    # */
+    raise Exception(f"Failed to write masked data to clone table: {e}")
