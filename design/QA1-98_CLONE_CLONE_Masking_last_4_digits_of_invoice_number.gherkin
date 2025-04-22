@@ -1,0 +1,49 @@
+Feature: Mask the last four digits of invoice_number in d_product_revenue_clone table
+
+  Background:
+    Given the Unity Catalog "purgo_databricks" is accessible
+    And the schema "purgo_playground" exists in "purgo_databricks"
+    And the table "purgo_playground.d_product_revenue_clone" does not exist
+    When the table "purgo_playground.d_product_revenue" is cloned to "purgo_playground.d_product_revenue_clone"
+    Then the table "purgo_playground.d_product_revenue_clone" should exist with identical schema to "purgo_playground.d_product_revenue"
+
+  Scenario: Successfully mask the last four digits of a valid numeric invoice_number
+    Given the "invoice_number" column in "purgo_playground.d_product_revenue_clone" table has a value "1234234534"
+    And the data type of "invoice_number" is bigint
+    When the PySpark masking logic is executed
+    Then the "invoice_number" should be updated to "123423****"
+
+  Scenario Outline: Mask the last four digits of various valid numeric invoice_numbers
+    Given the "invoice_number" column in "purgo_playground.d_product_revenue_clone" table has a value "<OriginalInvoiceNumber>"
+    And the data type of "invoice_number" is bigint
+    When the PySpark masking logic is executed
+    Then the "invoice_number" should be updated to "<MaskedInvoiceNumber>"
+
+    Examples:
+      | OriginalInvoiceNumber | MaskedInvoiceNumber |
+      | 1234234534            | 123423****          |
+      | 9876543210            | 987654****          |
+      | 4567890123            | 456789****          |
+
+  Scenario: Handle invoice_number with fewer than four digits
+    Given the "invoice_number" column in "purgo_playground.d_product_revenue_clone" table has a value "123"
+    And the data type of "invoice_number" is bigint
+    When the PySpark masking logic is executed
+    Then an error "Invoice number must have at least four digits" should be raised
+
+  Scenario: Handle non-numeric invoice_number values
+    Given the "invoice_number" column in "purgo_playground.d_product_revenue_clone" table has a value "ABC1234567"
+    And the data type of "invoice_number" is string
+    When the PySpark masking logic is executed
+    Then an error "Invalid invoice number format" should be raised
+
+  Scenario: Fail to mask invoice_number due to missing clone table
+    Given the table "purgo_playground.d_product_revenue_clone" does not exist
+    When the PySpark masking logic is executed
+    Then an error "Clone table purgo_playground.d_product_revenue_clone does not exist" should be raised
+
+  Scenario: Fail to create clone table due to insufficient permissions
+    Given the user does not have DROP permissions on "purgo_playground.d_product_revenue_clone"
+    Or the user does not have CREATE permissions on "purgo_playground"
+    When attempting to drop and clone the table
+    Then an error "Insufficient permissions to drop or create tables in purgo_playground" should be raised
