@@ -1,0 +1,58 @@
+Feature: Validate delivery_dt Datatype and Format in f_order Table
+
+  Background:
+    Given the f_order table exists in Unity Catalog "purgo_databricks" under schema "purgo_playground"
+    And the SQL script is located at "/Workspace/stg/scripts/f_order.sql"
+
+  Scenario: Successful validation of delivery_dt as Decimal(38,0) in yyyymmdd format
+    Given the f_order table contains a delivery_dt value "20240910"
+    When the SQL validation logic is executed
+    Then the delivery_dt "20240910" should be recognized as Decimal(38,0)
+    And the format of delivery_dt should match "yyyyMMdd"
+    And no validation errors should be reported
+
+  Scenario Outline: Validation failure due to incorrect delivery_dt datatype or format
+    Given the f_order table contains a delivery_dt value "<delivery_dt>"
+    When the SQL validation logic is executed
+    Then the delivery_dt "<delivery_dt>" should fail validation
+    And the error message should be "<error_message>"
+
+    Examples:
+      | delivery_dt | error_message                                    |
+      | 2024-09-10  | delivery_dt is not Decimal(38,0)                  |
+      | 20240931    | delivery_dt does not represent a valid date       |
+      | 20240000    | delivery_dt does not represent a valid date       |
+      | 20241301    | delivery_dt does not represent a valid date       |
+      | 2024091     | delivery_dt is not in yyyymmdd format             |
+      | 2024091001  | delivery_dt is not in yyyymmdd format             |
+      | -20240910   | delivery_dt must be a positive Decimal(38,0) value|
+
+  Scenario: All delivery_dt values pass validation
+    Given the f_order table is populated with valid delivery_dt values in yyyymmdd format as Decimal(38,0)
+    When the SQL validation logic is executed
+    Then all delivery_dt values should pass the Decimal(38,0) and yyyymmdd format checks
+    And no validation errors should be reported
+
+  Scenario: Some delivery_dt values have incorrect Decimal(38,0) datatype
+    Given the f_order table contains both valid and invalid delivery_dt values
+    When the SQL validation logic is executed
+    Then only the invalid delivery_dt values should fail the Decimal(38,0) check
+    And appropriate error messages should be logged for each failure
+
+  Scenario: Some delivery_dt values have incorrect yyyymmdd format
+    Given the f_order table contains delivery_dt values with incorrect formatting
+    When the SQL validation logic is executed
+    Then only the improperly formatted delivery_dt values should fail the yyyymmdd format check
+    And appropriate error messages should be logged for each failure
+
+  Scenario: Execution triggers and reporting
+    Given the SQL validation logic is scheduled to run daily
+    When the SQL job executes
+    Then the validation results should be logged in the reporting system
+    And any failures should trigger an alert with the corresponding error messages
+
+  Scenario: Performance constraints during validation
+    Given the f_order table contains a large volume of records
+    When the SQL validation logic is executed
+    Then the validation should complete within the specified performance thresholds
+    And resource utilization should remain within acceptable limits
