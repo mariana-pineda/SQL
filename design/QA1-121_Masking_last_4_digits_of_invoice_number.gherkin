@@ -1,0 +1,81 @@
+Feature: Mask the last four digits of invoice_number in d_product_revenue_clone table
+
+  Background:
+    Given a Databricks workspace with Unity Catalog "purgo_databricks"
+    And schema "purgo_playground" exists
+    And the table "purgo_playground.d_product_revenue" exists
+    And the table "purgo_playground.d_product_revenue_clone" is dropped if it exists
+    When the table "purgo_playground.d_product_revenue_clone" is created as a replica of "purgo_playground.d_product_revenue"
+
+  Scenario: Successfully mask the last four digits of a valid invoice_number
+    Given the "invoice_number" is "1234234534"
+    When the masking process is executed
+    Then the "invoice_number" should be "123423****"
+
+  Scenario Outline: Masking various valid invoice_number formats
+    Given the "invoice_number" is "<invoice_number>"
+    When the masking process is executed
+    Then the "invoice_number" should be "<expected_masked_invoice_number>"
+
+    Examples:
+      | invoice_number | expected_masked_invoice_number |
+      | 9876543210     | 987654****                     |
+      | 111122223333    | 11112222****                   |
+      | 555566667777    | 55556666****                   |
+      | 1234            | ****                            |
+
+  Scenario: Handle invoice_number with fewer than four digits
+    Given the "invoice_number" is "123"
+    When the masking process is executed
+    Then an error "invoice_number must have at least four digits" is thrown
+
+  Scenario: Handle null invoice_number
+    Given the "invoice_number" is null
+    When the masking process is executed
+    Then an error "invoice_number cannot be null" is thrown
+
+  Scenario Outline: Verify data type consistency for invoice_number
+    Given the "invoice_number" data type is "<data_type>"
+    When the masking process is executed
+    Then the data type of "invoice_number" remains "<data_type>"
+
+    Examples:
+      | data_type |
+      | bigint    |
+      | string    |
+
+  Scenario: Verify masked invoice_number is loaded into d_product_revenue_clone
+    Given the table "purgo_playground.d_product_revenue_clone" exists
+    And the "invoice_number" column contains masked values
+    When data is loaded into "purgo_playground.d_product_revenue_clone"
+    Then all "invoice_number" entries have the last four digits masked with '*'
+
+  Scenario: Validate invoice_number format after masking
+    Given the "invoice_number" is "1234234534"
+    When the masking process is executed
+    Then the "invoice_number" should match the regex "^\d{6}\*{4}$"
+
+  Scenario: Ensure no unintended columns are altered during masking
+    Given the table "purgo_playground.d_product_revenue_clone" is replicated
+    When the masking process is executed
+    Then only the "invoice_number" column is modified
+
+  Scenario: Confirm masking does not affect downstream systems
+    Given the masking process updates "purgo_playground.d_product_revenue_clone"
+    When downstream systems access "invoice_number"
+    Then they receive the masked "invoice_number" without errors
+
+  Scenario: Schedule the masking operation as a recurring job
+    Given the masking operation needs to run daily
+    When the PySpark script is scheduled
+    Then it executes the masking process every 24 hours
+
+  Scenario: Deploy the PySpark code within the Databricks environment
+    Given the PySpark masking script is developed
+    When it is deployed to the Databricks environment
+    Then it integrates with existing CI/CD pipelines
+
+  Scenario: Validate masked data meets acceptance criteria
+    Given the invoice data is masked
+    When data validation is performed
+    Then all masked "invoice_number" entries comply with the masking rules
