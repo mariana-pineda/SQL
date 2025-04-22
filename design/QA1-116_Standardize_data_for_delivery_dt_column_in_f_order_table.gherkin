@@ -1,0 +1,74 @@
+Feature: Data Standardization for delivery_dt in f_order Table
+
+  Background:
+    Given the f_order table exists in purgo_playground schema of purgo_databricks catalog
+    And the f_order table has a column delivery_dt with data type Decimal(38,0)
+
+  Scenario Outline: Validate delivery_dt data type and format
+    Given the delivery_dt value is "<delivery_dt>"
+    When the SQL logic for data standardization is executed
+    Then the delivery_dt should be of type Decimal(38,0)
+    And the delivery_dt should match the format "yyyyMMdd"
+    And the result should be "<result>"
+    And the error message should be "<error_message>"
+
+    Examples:
+      | delivery_dt | result    | error_message                               |
+      | 20240910    | Pass      |                                             |
+      | 2024-09-10  | Fail      | delivery_dt format is not yyyyMMdd          |
+      | 2024091     | Fail      | delivery_dt does not match required length  |
+      | 202409100   | Fail      | delivery_dt does not match required length  |
+      | "20240910"  | Fail      | delivery_dt is not of type Decimal(38,0)     |
+      | NULL        | Fail      | delivery_dt value is NULL                   |
+      | 20243101    | Pass      |                                             |
+      | 20240229    | Pass      |                                             |
+      | 20231301    | Fail      | delivery_dt contains invalid month          |
+      | 20240000    | Fail      | delivery_dt contains invalid day and month  |
+
+  Scenario: All delivery_dt values are valid
+    Given all delivery_dt values in f_order are Decimal(38,0) and in yyyyMMdd format
+    When the SQL logic for data standardization is executed
+    Then all delivery_dt values should pass the validation
+    And no error messages should be generated
+
+  Scenario: Some delivery_dt values have incorrect data type
+    Given some delivery_dt values in f_order are not Decimal(38,0)
+    When the SQL logic for data standardization is executed
+    Then those delivery_dt values should fail the data type validation
+    And appropriate error messages should be generated
+
+  Scenario: Some delivery_dt values have incorrect format
+    Given some delivery_dt values in f_order are not in yyyyMMdd format
+    When the SQL logic for data standardization is executed
+    Then those delivery_dt values should fail the format validation
+    And appropriate error messages should be generated
+
+  Scenario: delivery_dt contains NULL values
+    Given some delivery_dt values in f_order are NULL
+    When the SQL logic for data standardization is executed
+    Then those delivery_dt values should fail the NULL validation
+    And appropriate error messages should be generated
+
+  Scenario: SQL Logic Execution Frequency
+    Given the SQL logic is scheduled to run daily
+    When the SQL logic for data standardization is executed
+    Then the validation should occur without impacting system performance
+
+  Scenario: Execution Trigger on Data Load
+    Given new data is loaded into the f_order table
+    When the SQL logic for data standardization is triggered
+    Then the delivery_dt values in the new data should be validated immediately
+    And any failures should be reported promptly
+
+  Scenario: Reporting Validation Results
+    Given the SQL logic has been executed
+    When validation is complete
+    Then the results should be stored in dq_reports table
+    And the dq_reports table should reflect the status of delivery_dt validation
+
+  Scenario: Handling Validation Failures
+    Given the SQL logic has identified invalid delivery_dt values
+    When validation failures are detected
+    Then alerts should be sent to the data engineering team
+    And the dq_reports table should log the specific error messages
+
