@@ -1,0 +1,42 @@
+Feature: Mask the last four digits of invoice_number in d_product_revenue_clone
+
+  Background:
+    Given the Unity Catalog "purgo_databricks" with schema "purgo_playground"
+    And the table "purgo_playground.d_product_revenue_clone" does not exist
+    When the table "purgo_playground.d_product_revenue_clone" is dropped if it exists
+    And a replica of "purgo_playground.d_product_revenue" is created as "purgo_playground.d_product_revenue_clone"
+
+  Scenario Outline: Successfully mask the last four digits of a valid invoice_number
+    Given the table "purgo_playground.d_product_revenue_clone" contains an invoice_number "<original_invoice_number>"
+    When the PySpark masking logic is executed
+    Then the invoice_number should be updated to "<masked_invoice_number>"
+
+    Examples:
+      | original_invoice_number | masked_invoice_number |
+      | 1234234534              | 123423****            |
+      | 9876543210              | 987654****            |
+      | 555566667777            | 555566667***          |
+
+  Scenario: Handle invoice_number with fewer than four digits
+    Given the table "purgo_playground.d_product_revenue_clone" contains an invoice_number "123"
+    When the PySpark masking logic is executed
+    Then an error "Invoice number must have at least four digits" should be raised
+
+  Scenario: Handle null invoice_number
+    Given the table "purgo_playground.d_product_revenue_clone" contains a null invoice_number
+    When the PySpark masking logic is executed
+    Then an error "Invoice number cannot be null" should be raised
+
+  Scenario: Handle non-numeric invoice_number
+    Given the table "purgo_playground.d_product_revenue_clone" contains an invoice_number "INV12345AB"
+    When the PySpark masking logic is executed
+    Then an error "Invoice number must be numeric" should be raised
+
+  Scenario Outline: Validate invoice_number data type conversion from bigint to string
+    Given the table "purgo_playground.d_product_revenue_clone" has invoice_number data type "<original_data_type>"
+    When the PySpark masking logic is executed
+    Then the invoice_number data type should be "string"
+
+    Examples:
+      | original_data_type |
+      | bigint             |
