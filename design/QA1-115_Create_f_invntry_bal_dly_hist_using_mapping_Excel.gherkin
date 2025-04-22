@@ -1,0 +1,303 @@
+Feature: Load and Validate Data into purgo_playground.f_invntry_bal_dly_hist
+
+  Background:
+    Given the source tables are available in purgo_databricks.purgo_playground
+      | Table Name                  |
+      | itemledgerentrieswopd       |
+      | sap_master_data             |
+      | item_qty_on_hand            |
+      | reservation_entry           |
+      | Itemwopd                    |
+    And the target table purgo_playground.f_invntry_bal_dly_hist is defined
+    And the necessary permissions are configured in the Unity Catalog purgo_databricks
+
+  Scenario: Successfully load a complete and valid record
+    Given the source tables contain a record with:
+      | item_no_    | "ITEM123"               |
+      | location_code | "HAUPT"                |
+      | posting_date | "2023-10-01"            |
+      | reservation_status | "0"               |
+      | source_type | "37"                    |
+      | expiration_date | "2024-12-31"         |
+      | serial_no_ | "SN12345"                |
+      | lot_no_    | "LOT67890"               |
+      | qty_on_hand | "100.50"                |
+      | quantity_base | "-50.25"              |
+      | quantity_mrp_nettable | "80.00"      |
+      | standard_cost | "25.75"               |
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then a record should be inserted into f_invntry_bal_dly_hist with:
+      | co_key                        | "nav_ger1050"                                 |
+      | g_account                     | "ACC12345"                                    |
+      | g_assignment_type             | "Account"                                     |
+      | g_capture_dt_yyyymmdd         | "<current_date>"                              |
+      | g_company_cd                  | "1050"                                        |
+      | g_company_currency_cd         | "EUR"                                         |
+      | g_dnsa_dt_yyyymmdd            | "2024-12-31"                                  |
+      | g_expiration_dt_yyyymmdd      | "99991231"                                    |
+      | g_item_nbr                    | "ITEM123"                                     |
+      | g_location_cd                 | "HAUPT"                                       |
+      | g_location_status_cd          | "none"                                        |
+      | g_lot_effective_dt_yyyymmdd   | "19000101"                                    |
+      | g_lot_nbr                     | "LOT67890"                                    |
+      | g_lot_status_cd               | "none"                                        |
+      | g_plant_cd                    | "CAGER"                                       |
+      | g_qty_allocated               | "50.25"                                       |
+      | g_qty_available               | "100.50"                                      |
+      | g_qty_financial_nettable      | "100.50"                                      |
+      | g_qty_in_transit              | null                                          |
+      | g_qty_mrp_nettable            | "80.00"                                       |
+      | g_qty_on_hand                 | "100.50"                                      |
+      | g_qty_shippable               | "100.50"                                      |
+      | g_source_system_cd            | "nav_ger"                                     |
+      | g_unit_cost_company_currency  | "25.75"                                       |
+      | plant_key                     | "nav_gerCAGER"                                |
+      | plant_location_key            | "nav_gerCAGERHAUPT"                           |
+      | prod_key                      | "nav_gerITEM123"                              |
+      | prod_plant_key                | "nav_gerITEM123CAGER"                         |
+      | prod_plant_location_key       | "nav_gerITEM123CAGERHAUPT"                    |
+      | prod_plant_lot_key            | "nav_gerITEM123CAGERLOT67890"                 |
+      | prod_plant_lot_location_key   | "nav_gerITEM123CAGERLOT67890HAUPT"            |
+
+  Scenario Outline: Validate default and hardcoded field values when source data is missing
+    Given the source table itemledgerentrieswopd has a record with:
+      | item_no_    | "<item_no_>"            |
+      | location_code | "<location_code>"     |
+      | posting_date | "<posting_date>"      |
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the inserted record should have:
+      | g_assignment_type           | "Account"                             |
+      | g_company_cd                | "1050"                                |
+      | g_company_currency_cd       | "EUR"                                 |
+      | g_location_status_cd        | "none"                                |
+      | g_lot_status_cd             | "none"                                |
+      | g_plant_cd                  | "CAGER"                               |
+      | g_source_system_cd          | "nav_ger"                             |
+      | g_qty_in_transit            | null                                  |
+    Examples:
+      | item_no_ | location_code | posting_date |
+      | "ITEM456"| "GERMERING"   | "2023-09-15"  |
+      | "ITEM789"| "LIN"         | "2023-08-20"  |
+
+  Scenario: Fail to load record with missing mandatory field g_account
+    Given the source tables contain a record with:
+      | item_no_    | "ITEM123"               |
+      | location_code | "HAUPT"                |
+      | posting_date | "2023-10-01"            |
+      | reservation_status | "0"               |
+      | source_type | "37"                    |
+      | expiration_date | "2024-12-31"         |
+      | serial_no_ | "SN12345"                |
+      | lot_no_    | "LOT67890"               |
+      | qty_on_hand | "100.50"                |
+      | quantity_base | "-50.25"              |
+      | quantity_mrp_nettable | "80.00"      |
+      | standard_cost | "25.75"               |
+    And the g_account field is missing
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the record should not be inserted
+    And an error "g_account is missing or invalid" should be logged
+
+  Scenario: Validate alphanumeric constraint on g_account
+    Given the source tables contain a record with:
+      | item_no_    | "ITEM123"               |
+      | location_code | "HAUPT"                |
+      | posting_date | "2023-10-01"            |
+      | reservation_status | "0"               |
+      | source_type | "37"                    |
+      | expiration_date | "2024-12-31"         |
+      | serial_no_ | "SN12345"                |
+      | lot_no_    | "LOT67890"               |
+      | qty_on_hand | "100.50"                |
+      | quantity_base | "-50.25"              |
+      | quantity_mrp_nettable | "80.00"      |
+      | standard_cost | "25.75"               |
+      | g_account  | "ACC@123"                |
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the record should not be inserted
+    And an error "g_account must be alphanumeric" should be logged
+
+  Scenario: Validate date format for g_capture_dt_yyyymmdd
+    Given the source tables contain a record with:
+      | item_no_    | "ITEM123"               |
+      | location_code | "HAUPT"                |
+      | posting_date | "2023-10-01"            |
+      | reservation_status | "0"               |
+      | source_type | "37"                    |
+      | expiration_date | "2024-12-31"         |
+      | serial_no_ | "SN12345"                |
+      | lot_no_    | "LOT67890"               |
+      | qty_on_hand | "100.50"                |
+      | quantity_base | "-50.25"              |
+      | quantity_mrp_nettable | "80.00"      |
+      | standard_cost | "25.75"               |
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the inserted record should have g_capture_dt_yyyymmdd in "YYYYMMDD" format
+
+  Scenario: Validate concatenation for plant_key
+    Given the source tables contain a record with:
+      | source_system_cd | "nav_ger"             |
+      | g_plant_cd       | "CAGER"               |
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the inserted record should have plant_key as "nav_gerCAGER"
+
+  Scenario: Validate conditional population of g_qty_allocated
+    Given the source tables contain a record with:
+      | quantity_base | "-50.25"              |
+      | item_no_      | "ITEM123"             |
+      | location_code | "HAUPT"               |
+      | serial_no_    | "SN12345"             |
+      | lot_no_       | "LOT67890"            |
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the inserted record should have g_qty_allocated as "50.25"
+
+  Scenario Outline: Validate g_qty_available based on location_code
+    Given the source tables contain a record with:
+      | qty_on_hand    | "<qty_on_hand>"    |
+      | location_code  | "<location_code>"  |
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the inserted record should have g_qty_available as "<expected_qty_available>"
+    Examples:
+      | qty_on_hand | location_code | expected_qty_available |
+      | "100.50"    | "HAUPT"        | "100.50"               |
+      | "200.00"    | "GERMERING"    | "200.00"               |
+      | "150.75"    | "OTHER"        | null                   |
+
+  Scenario Outline: Validate g_qty_mrp_nettable based on location_code
+    Given the source tables contain a record with:
+      | qty_on_hand    | "<qty_on_hand>"                  |
+      | location_code  | "<location_code>"                |
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the inserted record should have g_qty_mrp_nettable as "<expected_qty_mrp_nettable>"
+    Examples:
+      | qty_on_hand | location_code | expected_qty_mrp_nettable |
+      | "80.00"     | "HAUPT"        | "80.00"                   |
+      | "60.50"     | "QS-WE"        | "60.50"                   |
+      | "70.25"     | "AH-LOC"       | "70.25"                   |
+      | "90.00"     | "UNKNOWN"      | null                      |
+
+  Scenario: Validate hardcoded value for g_source_system_cd
+    Given the source tables contain a record
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the inserted record should have g_source_system_cd as "nav_ger"
+
+  Scenario: Validate NULL handling for g_qty_in_transit
+    Given the source tables contain a record
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the inserted record should have g_qty_in_transit as null
+
+  Scenario: Validate default value for g_assignment_type when not represented
+    Given the source tables contain a record without g_assignment_type
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the inserted record should have g_assignment_type as "Account"
+
+  Scenario: Validate derived plant_location_key concatenation
+    Given the source tables contain a record with:
+      | source_system_cd | "nav_ger"         |
+      | g_plant_cd       | "CAGER"           |
+      | g_location_cd    | "HAUPT"           |
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the inserted record should have plant_location_key as "nav_gerCAGERHAUPT"
+
+  Scenario: Validate error logging for invalid data type in g_qty_on_hand
+    Given the source tables contain a record with:
+      | qty_on_hand | "invalid_decimal" |
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the record should not be inserted
+    And an error "g_qty_on_hand must be a decimal number" should be logged
+
+  Scenario: Validate default value for g_lot_nbr when lot_no_ contains blank space
+    Given the source tables contain a record with:
+      | lot_no_ | "LOT 67890" |
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the inserted record should have g_lot_nbr as "none"
+
+  Scenario: Validate derived key prod_plant_lot_location_key
+    Given the source tables contain a record with:
+      | source_system_cd | "nav_ger"         |
+      | g_item_nbr       | "ITEM123"         |
+      | g_plant_cd       | "CAGER"           |
+      | g_lot_nbr        | "LOT67890"        |
+      | g_location_cd    | "HAUPT"           |
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the inserted record should have prod_plant_lot_location_key as "nav_gerITEM123CAGERLOT67890HAUPT"
+
+  Scenario: Validate date completeness for g_capture_dt_yyyymmdd
+    Given the source tables contain a record with current date
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the inserted record should have g_capture_dt_yyyymmdd as the current date in "YYYYMMDD" format
+
+  Scenario: Validate handling of multiple joins without data duplication
+    Given the source tables item_qty_on_hand, itemledgerentrieswopd, sap_master_data, reservation_entry, and Itemwopd contain related records
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the record count in f_invntry_bal_dly_hist should equal the driving table item_qty_on_hand record count
+    And no duplicate records should exist in f_invntry_bal_dly_hist
+
+  Scenario: Validate data quality rules enforcement for alphanumeric fields
+    Given the source tables contain a record with:
+      | g_account | "ACC123"       |
+      | g_item_nbr | "ITEM456"     |
+      | g_location_cd | "LOC789"    |
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then all alphanumeric fields in the inserted record should contain only alphanumeric characters
+
+  Scenario: Validate ISO 4217 compliance for g_company_currency_cd
+    Given the source tables contain a record
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the inserted record should have g_company_currency_cd as a valid ISO 4217 currency code
+
+  Scenario: Validate scheduling and automation of daily data processing
+    Given the SQL-based logic is scheduled to run daily
+    When the scheduled job executes
+    Then the f_invntry_bal_dly_hist table should be updated with the latest 100 days of data
+
+  Scenario: Validate handling of NULL values in specific fields
+    Given the source tables contain a record with:
+      | some_field | null          |
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the inserted record should have the corresponding field set to NULL as specified
+
+  Scenario: Validate error handling and logging for SQL execution failures
+    Given the source tables contain invalid data causing SQL execution to fail
+    When the SQL-based logic is executed
+    Then the process should not insert any records
+    And an error log entry with the message "SQL execution failed due to invalid data" should be created
+
+  Scenario: Validate performance metrics are recorded after data load
+    Given the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    When the data load completes
+    Then performance metrics such as execution time and record count should be logged
+
+  Scenario: Validate change management by version controlling SQL logic
+    Given a new version of the SQL-based logic is committed to version control
+    When the SQL-based logic is deployed
+    Then the deployed version should match the version in the version control system
+
+  Scenario: Validate security compliance by restricting access to the target table
+    Given a user without proper permissions attempts to access f_invntry_bal_dly_hist
+    When the user queries the table
+    Then access should be denied with a "Permission denied" error
+
+  Scenario: Validate transformation logic for conditional quantity population
+    Given the source tables contain a record with:
+      | location_code | "MATRIUM"    |
+      | qty_on_hand   | "300.00"     |
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then the inserted record should have g_qty_available as "300.00"
+
+  Scenario: Validate handling of derived fields with complex concatenation
+    Given the source tables contain a record with:
+      | source_system_cd | "nav_ger"       |
+      | g_item_nbr       | "ITEM123"       |
+      | g_plant_cd       | "CAGER"         |
+      | g_location_cd    | "HAUPT"         |
+      | g_lot_nbr        | "LOT67890"      |
+    When the SQL-based logic is executed to populate f_invntry_bal_dly_hist
+    Then all derived keys should be correctly concatenated as follows:
+      | plant_key                   | "nav_gerCAGER"                     |
+      | plant_location_key          | "nav_gerCAGERHAUPT"                |
+      | prod_key                    | "nav_gerITEM123"                   |
+      | prod_plant_key              | "nav_gerITEM123CAGER"              |
+      | prod_plant_location_key     | "nav_gerITEM123CAGERHAUPT"         |
+      | prod_plant_lot_key          | "nav_gerITEM123CAGERLOT67890"      |
+      | prod_plant_lot_location_key | "nav_gerITEM123CAGERLOT67890HAUPT" |
