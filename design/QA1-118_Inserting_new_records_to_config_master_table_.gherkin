@@ -1,0 +1,190 @@
+Feature: Insert New Record into purgo_playground.config_master
+
+  Background:
+    Given the Unity Catalog "purgo_databricks" is accessible
+    And the schema "purgo_playground" exists
+    And the table "config_master" exists with the following columns:
+      | config_id             | int        |
+      | src_objt_name         | string     |
+      | src_sys               | string     |
+      | f_format              | string     |
+      | freq                  | string     |
+      | loc                   | string     |
+      | active_flag           | string     |
+      | s3_landing_path       | string     |
+      | s3_archive_path       | string     |
+      | s3_src_path           | string     |
+      | delta_load_ts         | string     |
+      | full_or_incr_load     | string     |
+      | zip_file              | string     |
+      | country               | string     |
+      | region                | string     |
+      | affiliate_group       | string     |
+      | affiliate             | string     |
+      | column_condition      | string     |
+      | dwh_path              | string     |
+      | delimiter             | string     |
+      | box_id                | string     |
+      | len_file              | string     |
+      | outbound_ind          | string     |
+      | outbound_loc          | string     |
+      | source_config_id      | string     |
+      | exception_report_path | string     |
+      | src_layer             | string     |
+      | quote_char            | string     |
+      | col_list              | string     |
+      | primary_key_col       | string     |
+      | email                 | string     |
+      | expected_dt           | string     |
+      | target_table          | string     |
+      | target_src_sys        | string     |
+      | dynamic_dt_file_loc   | string     |
+      | dt_pattern            | string     |
+      | latest_file_processed | string     |
+      | delta_stg_tables      | string     |
+      | stg_skip_indicator    | string     |
+      | delta_stg_table_view  | string     |
+      | delta_pret1_table     | string     |
+      | pre_t1_skip_indicator | string     |
+      | t2_force_exclude      | string     |
+      | dq_rule_name          | string     |
+      | source_path           | string     |
+      | pre_process_function  | string     |
+      | encode_val            | string     |
+      | decode_val            | string     |
+      | header                | string     |
+      | inferschema           | string     |
+      | actual_file_name      | string     |
+      | t1_layer_flag         | string     |
+      | t2_layer_flag         | string     |
+      | t3_layer_flag         | string     |
+      | dag_id                | string     |
+
+  Scenario Outline: Successfully insert a new config_master record
+    Given an existing record in "config_master" with config_id <ExistingConfigID>
+    When I retrieve the record with config_id <ExistingConfigID>
+    And I update the following columns:
+      | src_objt_name    | ID_Sales                   |
+      | src_sys          | ID_Sales                   |
+      | f_format         | ID_MON_Sales_              |
+      | s3_landing_path  | s3a://<s3_bucket>/landing/ID/ID_Sales/  |
+      | s3_archive_path  | s3a://<s3_bucket>/archive/ID/ID_Sales/  |
+      | country          | ID                         |
+      | region           | ID                         |
+      | affiliate_group  | ID                         |
+      | affiliate        | ID                         |
+      | src_layer        | ID_Sales                   |
+      | target_src_sys   | ID_Sales                   |
+      | delta_stg_tables | stg_ID_sales               |
+      | source_path      | /SecureFtp/-InternalX/ID/IN/DATA/Sales/ |
+      | actual_file_name | ID_MON_Sales_*             |
+      | dag_id           | LOAD_SALES_ID              |
+    And I append the modified record to "config_master"
+    Then the new record should exist in "config_master" with the following values:
+      | src_objt_name    | ID_Sales                   |
+      | src_sys          | ID_Sales                   |
+      | f_format         | ID_MON_Sales_              |
+      | s3_landing_path  | s3a://my_bucket/landing/ID/ID_Sales/  |
+      | s3_archive_path  | s3a://my_bucket/archive/ID/ID_Sales/  |
+      | country          | ID                         |
+      | region           | ID                         |
+      | affiliate_group  | ID                         |
+      | affiliate        | ID                         |
+      | src_layer        | ID_Sales                   |
+      | target_src_sys   | ID_Sales                   |
+      | delta_stg_tables | stg_ID_sales               |
+      | source_path      | /SecureFtp/-InternalX/ID/IN/DATA/Sales/ |
+      | actual_file_name | stg_ID_wholesaler          |
+      | dag_id           | LOAD_SALES_ID              |
+
+    Examples:
+      | ExistingConfigID | s3_bucket  |
+      | 1001             | my_bucket  |
+      | 1002             | data_bucket|
+
+  Scenario: Fail to insert a new config_master record due to duplicate dag_id
+    Given an existing record in "config_master" with dag_id "LOAD_SALES_ID"
+    When I attempt to insert a new record with dag_id "LOAD_SALES_ID"
+    Then the insertion should fail with error message "Duplicate dag_id detected: LOAD_SALES_ID"
+
+  Scenario: Fail to insert a new config_master record due to missing required fields
+    Given I have the following data for the new config_master record:
+      | src_objt_name    | ID_Sales      |
+      | src_sys          | ID_Sales      |
+      | f_format         | ID_MON_Sales_ |
+      | s3_landing_path  |               |
+      | s3_archive_path  |               |
+      | country          | ID            |
+      | region           | ID            |
+      | affiliate_group  | ID            |
+      | affiliate        | ID            |
+      | src_layer        | ID_Sales      |
+      | target_src_sys   | ID_Sales      |
+      | delta_stg_tables | stg_ID_sales  |
+      | source_path      | /SecureFtp/-InternalX/ID/IN/DATA/Sales/ |
+      | actual_file_name | ID_MON_Sales_*|
+      | dag_id           | LOAD_SALES_ID_NEW |
+    When I attempt to insert the new record into "config_master"
+    Then the insertion should fail with error message "s3_landing_path and s3_archive_path are required fields"
+
+  Scenario: Fail to insert a new config_master record due to invalid s3_landing_path format
+    Given I have the following data for the new config_master record:
+      | src_objt_name    | ID_Sales        |
+      | src_sys          | ID_Sales        |
+      | f_format         | ID_MON_Sales_   |
+      | s3_landing_path  | invalid_path    |
+      | s3_archive_path  | s3a://my_bucket/archive/ID/ID_Sales/  |
+      | country          | ID              |
+      | region           | ID              |
+      | affiliate_group  | ID              |
+      | affiliate        | ID              |
+      | src_layer        | ID_Sales        |
+      | target_src_sys   | ID_Sales        |
+      | delta_stg_tables | stg_ID_sales    |
+      | source_path      | /SecureFtp/-InternalX/ID/IN/DATA/Sales/ |
+      | actual_file_name | ID_MON_Sales_*  |
+      | dag_id           | LOAD_SALES_ID_VALID |
+    When I attempt to insert the new record into "config_master"
+    Then the insertion should fail with error message "s3_landing_path must follow the format s3a://{s3_bucket}/landing/ID/ID_Sales/"
+
+  Scenario: Fail to insert a new config_master record due to missing s3_bucket value
+    Given I have the following data for the new config_master record:
+      | src_objt_name    | ID_Sales        |
+      | src_sys          | ID_Sales        |
+      | f_format         | ID_MON_Sales_   |
+      | s3_landing_path  | s3a:///landing/ID/ID_Sales/  |
+      | s3_archive_path  | s3a://archive_bucket/archive/ID/ID_Sales/ |
+      | country          | ID              |
+      | region           | ID              |
+      | affiliate_group  | ID              |
+      | affiliate        | ID              |
+      | src_layer        | ID_Sales        |
+      | target_src_sys   | ID_Sales        |
+      | delta_stg_tables | stg_ID_sales    |
+      | source_path      | /SecureFtp/-InternalX/ID/IN/DATA/Sales/ |
+      | actual_file_name | ID_MON_Sales_*  |
+      | dag_id           | LOAD_SALES_ID_NO_BUCKET |
+    When I attempt to insert the new record into "config_master"
+    Then the insertion should fail with error message "s3_bucket value is missing in s3_landing_path"
+
+  Scenario: Verify config_id is auto-generated upon successful insertion
+    Given the current maximum config_id in "config_master" is <MaxConfigID>
+    When I insert a new valid record into "config_master"
+    Then the new record should have config_id equal to <MaxConfigID> + 1
+    And all other fields should match the provided values
+
+    Examples:
+      | MaxConfigID |
+      | 2000        |
+      | 3000        |
+
+  Scenario: Ensure permissions are enforced for inserting records into config_master
+    Given a user without write permissions attempts to insert a new record into "config_master"
+    When the user tries to execute the insertion script
+    Then the operation should be denied with error message "Insufficient permissions to modify config_master table"
+
+  Scenario: Validate handling of downstream dependencies after insertion
+    Given a new record is successfully inserted into "config_master"
+    When downstream processes attempt to read the new configuration
+    Then the downstream processes should process data from "s3_landing_path" s3a://<s3_bucket>/landing/ID/ID_Sales/ correctly
+    And archive data to "s3_archive_path" s3a://<s3_bucket>/archive/ID/ID_Sales/ without errors
