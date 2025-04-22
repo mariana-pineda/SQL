@@ -1,0 +1,54 @@
+Feature: Mask the last four digits of invoice_number in d_product_revenue_clone table
+
+  Background:
+    Given the Unity Catalog "purgo_databricks" is accessible
+    And the schema "purgo_playground" exists
+    And the table "purgo_playground.d_product_revenue_clone" does not exist
+    When the table "purgo_playground.d_product_revenue_clone" is dropped if it exists
+    And a replica of "purgo_playground.d_product_revenue" is created as "purgo_playground.d_product_revenue_clone"
+
+  Scenario: Successfully mask the last four digits of a valid invoice_number
+    Given the "purgo_playground.d_product_revenue_clone" table contains a record with invoice_number "1234234534"
+    When the PySpark masking job is executed
+    Then the invoice_number for that record should be "123423****"
+    And the data type of invoice_number should be "string"
+
+  Scenario Outline: Mask multiple invoice_number values with varying formats
+    Given the "purgo_playground.d_product_revenue_clone" table contains a record with invoice_number "<original_invoice_number>"
+    When the PySpark masking job is executed
+    Then the invoice_number for that record should be "<masked_invoice_number>"
+    And the data type of invoice_number should be "string"
+
+    Examples:
+      | original_invoice_number | masked_invoice_number |
+      | 1234234534              | 123423****            |
+      | 98765432101234          | 9876543210****        |
+      | 55555555                | 5555****              |
+      | 00001234                | 0000****              |
+
+  Scenario: Handle invoice_number with fewer than four digits
+    Given the "purgo_playground.d_product_revenue_clone" table contains a record with invoice_number "123"
+    When the PySpark masking job is executed
+    Then an error "Invoice number must have at least 4 digits to mask" should be logged
+
+  Scenario: Handle null invoice_number
+    Given the "purgo_playground.d_product_revenue_clone" table contains a record with a null invoice_number
+    When the PySpark masking job is executed
+    Then an error "Invoice number cannot be null" should be logged
+
+  Scenario: Ensure invoice_number data type is converted to string after masking
+    Given the "purgo_playground.d_product_revenue_clone" table contains a record with invoice_number "9876543210"
+    When the PySpark masking job is executed
+    Then the masked invoice_number should be "987654****"
+    And the data type of invoice_number should be "string"
+
+  Scenario: Verify that only the last four digits are masked
+    Given the "purgo_playground.d_product_revenue_clone" table contains a record with invoice_number "567890123456"
+    When the PySpark masking job is executed
+    Then the invoice_number for that record should be "56789012****"
+    And the first digits before the last four should remain unchanged
+
+  Scenario: Validate that non-numeric invoice_number values are handled appropriately
+    Given the "purgo_playground.d_product_revenue_clone" table contains a record with invoice_number "ABCDEF1234"
+    When the PySpark masking job is executed
+    Then an error "Invoice number must be numeric" should be logged
