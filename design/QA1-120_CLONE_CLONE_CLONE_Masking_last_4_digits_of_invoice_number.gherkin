@@ -1,0 +1,82 @@
+Feature: Mask the last four digits of invoice_number in d_product_revenue_clone table
+
+  Background:
+    Given the Unity Catalog "purgo_databricks" with schema "purgo_playground" exists
+    And the table "purgo_playground.d_product_revenue" exists with the following columns:
+      | product_id                     | bigint                   |
+      | product_name                   | string                   |
+      | product_type                   | string                   |
+      | revenue                        | bigint                   |
+      | country                        | string                   |
+      | customer_id                    | string                   |
+      | purchased_date                 | date                     |
+      | invoice_date                   | date                     |
+      | invoice_number                 | bigint                   |
+      | is_returned                    | bigint                   |
+      | customer_satisfaction_score    | bigint                   |
+      | product_details                | string                   |
+      | customer_first_purchased_date  | date                     |
+      | customer_first_product         | string                   |
+      | customer_first_revenue         | double                   |
+    And the replica table "purgo_playground.d_product_revenue_clone" does not exist
+    When the replica table "purgo_playground.d_product_revenue_clone" is created from "purgo_playground.d_product_revenue"
+
+  Scenario Outline: Successfully mask the last four digits of invoice_number
+    Given the table "purgo_playground.d_product_revenue_clone" contains an invoice_number "<original_invoice_number>"
+    When the PySpark masking logic is executed to mask the last four digits of invoice_number
+    Then the invoice_number "<original_invoice_number>" should be updated to "<masked_invoice_number>"
+
+    Examples:
+      | original_invoice_number | masked_invoice_number |
+      | 1234234534              | 123423****            |
+      | 9876543210              | 987654****            |
+      | 555566667777            | 55556666****           |
+      | 1000                    | ****                   |
+
+  Scenario: Handle invoice_number with less than four digits
+    Given the table "purgo_playground.d_product_revenue_clone" contains an invoice_number "123"
+    When the PySpark masking logic is executed to mask the last four digits of invoice_number
+    Then the invoice_number "123" should be updated to "***"
+
+  Scenario: Masking logic preserves non-invoice_number columns
+    Given the table "purgo_playground.d_product_revenue_clone" contains a row with
+      | product_id | product_name | invoice_number | revenue | country |
+      | 1          | "ProductA"   | 1234234534     | 1000    | "USA"   |
+    When the PySpark masking logic is executed to mask the last four digits of invoice_number
+    Then all other columns except invoice_number should remain unchanged for the row with product_id 1
+
+  Scenario: Fail to create replica table if source table does not exist
+    Given the source table "purgo_playground.d_product_revenue" does not exist
+    When attempting to create the replica table "purgo_playground.d_product_revenue_clone"
+    Then an error "Source table purgo_playground.d_product_revenue does not exist" should be raised
+
+  Scenario: Fail masking if invoice_number column is missing in replica table
+    Given the replica table "purgo_playground.d_product_revenue_clone" exists without the "invoice_number" column
+    When the PySpark masking logic is executed
+    Then an error "Column invoice_number does not exist in purgo_playground.d_product_revenue_clone" should be raised
+
+  Scenario: Validate data type conversion after masking
+    Given the table "purgo_playground.d_product_revenue_clone" contains an invoice_number "1234234534"
+    When the PySpark masking logic is executed to mask the last four digits of invoice_number
+    Then the data type of invoice_number should be string in "purgo_playground.d_product_revenue_clone"
+
+  Scenario: Ensure masked invoice_number follows the correct format
+    Given the table "purgo_playground.d_product_revenue_clone" contains invoice_numbers of various formats
+    When the PySpark masking logic is executed to mask the last four digits of invoice_number
+    Then all masked invoice_numbers should have the last four characters replaced with '*'
+
+  Scenario: Verify performance with large data volumes
+    Given the table "purgo_playground.d_product_revenue_clone" contains 10 million records
+    When the PySpark masking logic is executed to mask the last four digits of invoice_number
+    Then the masking process should complete within 30 minutes
+
+  Scenario: Ensure no original invoice_number data is retained post-masking
+    Given the table "purgo_playground.d_product_revenue_clone" contains various invoice_numbers
+    When the PySpark masking logic is executed to mask the last four digits of invoice_number
+    Then no original invoice_number should be retrievable from "purgo_playground.d_product_revenue_clone"
+
+  Scenario: Validate error handling for null invoice_number values
+    Given the table "purgo_playground.d_product_revenue_clone" contains rows with null invoice_number
+    When the PySpark masking logic is executed to mask the last four digits of invoice_number
+    Then the rows with null invoice_number should remain unchanged
+    And a warning "Null invoice_number encountered for product_id <id>" should be logged
