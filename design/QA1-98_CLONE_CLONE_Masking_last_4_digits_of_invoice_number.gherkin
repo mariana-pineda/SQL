@@ -1,49 +1,66 @@
-Feature: Mask the last four digits of invoice_number in d_product_revenue_clone table
+Feature: Masking Invoice Numbers in d_product_revenue_clone Table
+  Ensure that the last four digits of invoice_number in the d_product_revenue_clone table are masked with '*' to protect customer information.
 
   Background:
-    Given the Unity Catalog "purgo_databricks" is accessible
-    And the schema "purgo_playground" exists in "purgo_databricks"
-    And the table "purgo_playground.d_product_revenue_clone" does not exist
-    When the table "purgo_playground.d_product_revenue" is cloned to "purgo_playground.d_product_revenue_clone"
-    Then the table "purgo_playground.d_product_revenue_clone" should exist with identical schema to "purgo_playground.d_product_revenue"
+    Given the table "purgo_playground.d_product_revenue_clone" does not exist
+    When I drop the table "purgo_playground.d_product_revenue_clone" if it exists
+    And I create a replica of "purgo_playground.d_product_revenue" as "purgo_playground.d_product_revenue_clone"
 
-  Scenario: Successfully mask the last four digits of a valid numeric invoice_number
-    Given the "invoice_number" column in "purgo_playground.d_product_revenue_clone" table has a value "1234234534"
-    And the data type of "invoice_number" is bigint
-    When the PySpark masking logic is executed
-    Then the "invoice_number" should be updated to "123423****"
+  Scenario: Successfully mask the last four digits of a valid invoice_number
+    Given the "purgo_playground.d_product_revenue_clone" table exists
+    And the "invoice_number" column contains valid bigint values
+    When I apply the PySpark masking logic to the "invoice_number" column
+    Then the last four digits of each "invoice_number" should be replaced with "****"
+    And the "invoice_number" column should be of type string
 
-  Scenario Outline: Mask the last four digits of various valid numeric invoice_numbers
-    Given the "invoice_number" column in "purgo_playground.d_product_revenue_clone" table has a value "<OriginalInvoiceNumber>"
-    And the data type of "invoice_number" is bigint
-    When the PySpark masking logic is executed
-    Then the "invoice_number" should be updated to "<MaskedInvoiceNumber>"
+  Scenario Outline: Masking various invoice_number formats
+    Given the "purgo_playground.d_product_revenue_clone" table exists
+    When I mask the "invoice_number" value "<invoice_number>"
+    Then the masked "invoice_number" should be "<masked_invoice_number>"
 
     Examples:
-      | OriginalInvoiceNumber | MaskedInvoiceNumber |
-      | 1234234534            | 123423****          |
-      | 9876543210            | 987654****          |
-      | 4567890123            | 456789****          |
+      | invoice_number | masked_invoice_number |
+      | 1234234534     | 123423****            |
+      | 9876543210     | 987654****            |
+      | 5678901234     | 567890****            |
+      | 1020304050     | 102030****            |
 
   Scenario: Handle invoice_number with fewer than four digits
-    Given the "invoice_number" column in "purgo_playground.d_product_revenue_clone" table has a value "123"
-    And the data type of "invoice_number" is bigint
-    When the PySpark masking logic is executed
-    Then an error "Invoice number must have at least four digits" should be raised
+    Given the "purgo_playground.d_product_revenue_clone" table exists
+    And the "invoice_number" value is "123"
+    When I apply the PySpark masking logic to the "invoice_number" column
+    Then an error "Invoice number must have at least four digits to mask." should be raised
 
-  Scenario: Handle non-numeric invoice_number values
-    Given the "invoice_number" column in "purgo_playground.d_product_revenue_clone" table has a value "ABC1234567"
-    And the data type of "invoice_number" is string
-    When the PySpark masking logic is executed
-    Then an error "Invalid invoice number format" should be raised
+  Scenario: Source table does not exist during cloning
+    Given the table "purgo_playground.d_product_revenue" does not exist
+    When I attempt to create a replica of "purgo_playground.d_product_revenue" as "purgo_playground.d_product_revenue_clone"
+    Then an error "Source table purgo_playground.d_product_revenue does not exist." should be returned
 
-  Scenario: Fail to mask invoice_number due to missing clone table
-    Given the table "purgo_playground.d_product_revenue_clone" does not exist
-    When the PySpark masking logic is executed
-    Then an error "Clone table purgo_playground.d_product_revenue_clone does not exist" should be raised
+  Scenario: Data type conversion for masked invoice_number
+    Given the "purgo_playground.d_product_revenue_clone" table exists
+    When I change the data type of "invoice_number" from bigint to string
+    Then the data type of "invoice_number" should be string
+    And existing numeric operations on "invoice_number" should be disabled
 
-  Scenario: Fail to create clone table due to insufficient permissions
-    Given the user does not have DROP permissions on "purgo_playground.d_product_revenue_clone"
-    Or the user does not have CREATE permissions on "purgo_playground"
-    When attempting to drop and clone the table
-    Then an error "Insufficient permissions to drop or create tables in purgo_playground" should be raised
+  Scenario: Ensure data integrity after masking
+    Given the "purgo_playground.d_product_revenue_clone" table exists with foreign key relationships
+    When I apply the PySpark masking logic to the "invoice_number" column
+    Then all foreign key constraints should remain intact
+    And related tables should reflect the masked "invoice_number" appropriately
+
+  Scenario: Automated masking process execution
+    Given the masking process is scheduled to run daily
+    When the daily schedule triggers the masking job
+    Then the "invoice_number" column in "purgo_playground.d_product_revenue_clone" should have the last four digits masked with "*"
+    And a success message "Masking process completed successfully." should be logged
+
+  Scenario: Validate masked invoice_number format
+    Given the "purgo_playground.d_product_revenue_clone" table exists
+    When I retrieve the "invoice_number" from the table
+    Then each "invoice_number" should match the regex "^\d{6}\*{4}$"
+
+  Scenario: Error handling for unexpected data types in invoice_number
+    Given the "purgo_playground.d_product_revenue_clone" table exists
+    And the "invoice_number" column contains non-bigint values
+    When I apply the PySpark masking logic to the "invoice_number" column
+    Then an error "Invalid data type for invoice_number. Expected bigint." should be raised
