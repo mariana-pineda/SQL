@@ -1,0 +1,33 @@
+Feature: Standardize delivery_dt in f_order table to Decimal (38,0) in yyyymmdd format
+
+  Background:
+    Given the SQL script is located at "/Workspace/stg/scripts/f_order.sql"
+    And the Unity Catalog is set to "purgo_databricks"
+    And the Schema is "purgo_playground"
+
+  Scenario: Validate all delivery_dt values are Decimal (38,0) and in yyyymmdd format
+    When the SQL validation is executed
+    Then all delivery_dt values should be of type Decimal(38,0)
+    And all delivery_dt values should match the format "yyyymmdd"
+
+  Scenario Outline: Validate specific delivery_dt values
+    Given a delivery_dt value of "<delivery_dt>"
+    When the SQL validation is performed
+    Then the validation result should be "<expected_result>"
+    And the message should be "<message>"
+
+    Examples:
+      | delivery_dt | expected_result | message                         |
+      | 20240910    | Pass            | Valid Decimal (38,0) yyyymmdd    |
+      | 2024-09-10  | Fail            | Invalid format and datatype      |
+      | 2024091A    | Fail            | Non-numeric characters           |
+      | 202409      | Fail            | Incorrect length                  |
+
+  Scenario: Log errors for invalid delivery_dt values
+    When invalid delivery_dt values are detected
+    Then an error should be logged with the message "Invalid delivery_dt format or datatype"
+
+  Scenario: Reject records with non-conforming delivery_dt
+    When processing records in f_order table
+    Then records with invalid delivery_dt should be rejected
+    And an error should be raised for each rejected record
