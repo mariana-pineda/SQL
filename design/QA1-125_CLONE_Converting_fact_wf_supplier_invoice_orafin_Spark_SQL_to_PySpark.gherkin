@@ -1,0 +1,133 @@
+Feature: Convert Spark.SQL Notebook to PySpark Code
+
+  In order to ensure seamless transition from Spark.SQL to PySpark
+  As a data engineer
+  I want to convert the Spark.SQL code in the provided notebook to PySpark, including all necessary functions and configurations
+
+  Background:
+    Given the Unity Catalog is set to "purgo_databricks"
+    And the Unity Catalog Schema is set to "purgo_playground"
+    And the necessary modules "Constants" and "ReusableFunctions" are available
+    And all external dependencies and libraries are installed
+    And the environment is configured according to requirements
+
+  Scenario Outline: Successful conversion of Spark.SQL to PySpark
+    Given the Spark.SQL notebook "fact_wf_supplier_invoice_orafin.ipynb" is provided
+    When the notebook is converted to PySpark code
+    Then the PySpark code should include all functionalities from Spark.SQL
+    And the PySpark code should use the Unity Catalog "purgo_databricks" and schema "purgo_playground"
+    And the PySpark code should correctly reference the modules "Constants" and "ReusableFunctions"
+    And the PySpark code should handle the tables "supplier_invoice_orig", "supplier_invoice", "f_supplier_invoice", "supplier_invoice_bkp", "stg_ca_wholesaler", "ods_non_contracting_clone", "stg_nl_wholesaler_clone", "ods_copay_clone", "stg_nl_wholesaler", and "stg_us_wholesaler"
+    Examples:
+      | notebook_name                      | unity_catalog    | unity_schema     |
+      | fact_wf_supplier_invoice_orafin.ipynb | purgo_databricks | purgo_playground |
+
+  Scenario: Conversion fails due to missing Constants module
+    Given the Spark.SQL notebook "fact_wf_supplier_invoice_orafin.ipynb" is provided
+    And the "Constants" module is missing
+    When the notebook conversion to PySpark is attempted
+    Then the conversion should fail
+    And an error message "Constants module is undefined" should be displayed
+
+  Scenario: Conversion fails due to missing ReusableFunctions module
+    Given the Spark.SQL notebook "fact_wf_supplier_invoice_orafin.ipynb" is provided
+    And the "ReusableFunctions" module is missing
+    When the notebook conversion to PySpark is attempted
+    Then the conversion should fail
+    And an error message "ReusableFunctions module is undefined" should be displayed
+
+  Scenario: Conversion fails due to missing external dependencies
+    Given the Spark.SQL notebook "fact_wf_supplier_invoice_orafin.ipynb" is provided
+    And external dependencies "library_X" and "library_Y" are not installed
+    When the notebook conversion to PySpark is attempted
+    Then the conversion should fail
+    And an error message "Missing external dependencies: library_X, library_Y" should be displayed
+
+  Scenario: Conversion fails due to incorrect environment configuration
+    Given the Spark.SQL notebook "fact_wf_supplier_invoice_orafin.ipynb" is provided
+    And the environment is not configured with "spark.sql.sources.partitionOverwriteMode" set to "dynamic"
+    When the notebook conversion to PySpark is attempted
+    Then the conversion should fail
+    And an error message "Environment configuration 'spark.sql.sources.partitionOverwriteMode' is incorrect" should be displayed
+
+  Scenario Outline: Validate output PySpark code for different table configurations
+    Given the Spark.SQL notebook "fact_wf_supplier_invoice_orafin.ipynb" is provided
+    And the table "<table_name>" has columns "<columns>"
+    When the notebook is converted to PySpark code
+    Then the PySpark code should correctly handle the table "<table_name>" with columns "<columns>"
+    Examples:
+      | table_name                 | columns                                                                                                                          |
+      | supplier_invoice_orig      | src_sys_cd:string, po_nbr:string, po_line_nbr:string, invc_co_amt:double, invc_txn_amt:double, invc_txn_type:string         |
+      | supplier_invoice           | src_sys_cd:string, po_nbr:string, po_line_nbr:string, invc_co_amt:double, invc_txn_amt:double, invc_txn_type:string         |
+      | f_supplier_invoice         | invc_entry_period:timestamp, suplr_invc_nbr:string, vchr_nbr:string, vchr_line_nbr:string, fscl_yr_nbr:bigint           |
+      | supplier_invoice_bkp       | src_sys_cd:string, po_nbr:string, po_line_nbr:string, invc_co_amt:double, invc_txn_amt:double, invc_txn_type:string         |
+      | stg_ca_wholesaler          | filename:string, src_sys_name:string, src_product_id:string, src_prod_desc:string, brand:string, customer_id:string         |
+      | ods_non_contracting_clone  | PM_ID:string, Shipment_Date:string, Dispense_ID:bigint, DELETE_FLAG:string, Facility:string, Units_Provided:bigint           |
+      | stg_nl_wholesaler_clone    | Wholesaler_File_Name:string, Source_System_Name:string, Source_Product_ID:string, Source_Product_Description:string         |
+      | ods_copay_clone            | PM_ID:string, NDC:string, Date_of_Service:string, Rx_Claim_Number:string, DELETE_FLAG:string, Copay_Amount:bigint            |
+      | stg_nl_wholesaler          | Wholesaler_File_Name:string, Source_System_Name:string, Source_Product_ID:string, Source_Product_Description:string         |
+      | stg_us_wholesaler          | Wholesaler_File_Name:string, Source_System_Name:string, Source_Product_ID:double, Source_Product_Description:string        |
+
+  Scenario: Validate error message for unsupported functions in PySpark conversion
+    Given the Spark.SQL notebook "fact_wf_supplier_invoice_orafin.ipynb" contains unsupported Spark.SQL functions
+    When the notebook conversion to PySpark is attempted
+    Then the conversion should fail
+    And an error message "Unsupported function <function_name> in Spark.SQL" should be displayed
+
+  Scenario: Validate environment variable configurations post-conversion
+    Given the Spark.SQL notebook "fact_wf_supplier_invoice_orafin.ipynb" is converted to PySpark
+    When the PySpark code is executed
+    Then the environment variables such as "raw_catalog.schema" and "unity_catalog.schema" should be correctly set
+    And the PySpark code should reflect the configurations:
+      | Configuration Key               | Value                       |
+      | raw_catalog.schema              | <raw_unity_catalog>         |
+      | unity_catalog.schema            | purgo_databricks            |
+
+  Scenario: Data integrity check after PySpark conversion
+    Given the Spark.SQL notebook "fact_wf_supplier_invoice_orafin.ipynb" is converted to PySpark
+    When the PySpark code processes the data
+    Then the resulting tables "supplier_invoice_orig", "supplier_invoice", "f_supplier_invoice", "supplier_invoice_bkp" should contain identical data as produced by the original Spark.SQL code
+    And all columns should adhere to their specified data types and validation rules
+
+  Scenario: Validate handling of missing or null values in PySpark conversion
+    Given the Spark.SQL notebook "fact_wf_supplier_invoice_orafin.ipynb" is converted to PySpark
+    When the PySpark code processes records with missing or null values
+    Then the PySpark code should apply the same filtering and defaulting logic as the original Spark.SQL code
+    And the resulting data should maintain data integrity without unintended nulls
+
+  Scenario Outline: Handle different load types during conversion
+    Given the Spark.SQL notebook "fact_wf_supplier_invoice_orafin.ipynb" is provided
+    And the load type is set to "<load_type>"
+    When the notebook is converted to PySpark code
+    Then the PySpark code should handle the load type "<load_type>" appropriately
+    And the resulting data should reflect the load type-specific logic
+    Examples:
+      | load_type      |
+      | full_load      |
+      | incremental    |
+      | batch_processing|
+
+  Scenario: Validate error handling for invalid input parameters
+    Given the Spark.SQL notebook "fact_wf_supplier_invoice_orafin.ipynb" is provided
+    And the input parameters such as "target_table_path" are invalid or improperly formatted
+    When the notebook conversion to PySpark is attempted
+    Then the conversion should fail
+    And an error message "Invalid input parameter: target_table_path" should be displayed
+
+  Scenario: Confirm inclusion of all original SQL queries in PySpark
+    Given the Spark.SQL notebook "fact_wf_supplier_invoice_orafin.ipynb" contains multiple SQL queries
+    When the notebook is converted to PySpark code
+    Then all SQL queries should be translated to equivalent PySpark DataFrame operations
+    And the logical flow of data transformations should remain consistent
+
+  Scenario: Validate logging and error tracking in PySpark code
+    Given the Spark.SQL notebook "fact_wf_supplier_invoice_orafin.ipynb" is converted to PySpark
+    When the PySpark code is executed
+    Then the code should include appropriate logging for operations and errors
+    And error messages should be descriptive and actionable
+
+  Scenario: Ensure PySpark code adheres to performance optimization best practices
+    Given the Spark.SQL notebook "fact_wf_supplier_invoice_orafin.ipynb" is converted to PySpark
+    When the PySpark code is executed
+    Then the code should utilize Spark optimizations such as caching, partitioning, and efficient joins
+    And the execution performance should be comparable or better than the original Spark.SQL implementation
