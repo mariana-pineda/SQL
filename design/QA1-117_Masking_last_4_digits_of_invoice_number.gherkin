@@ -1,0 +1,45 @@
+Feature: Masking of Invoice Numbers in d_product_revenue_clone Table
+
+  Background:
+    Given the Unity Catalog "purgo_databricks" is accessible
+    And the Unity Catalog Schema "purgo_playground" is selected
+    And the table "d_product_revenue_clone" does not exist
+    When the table "d_product_revenue" is cloned to "d_product_revenue_clone"
+
+  Scenario: Successfully mask the last four digits of invoice_number
+    Given the "d_product_revenue_clone" table exists with column "invoice_number" as bigint
+    When the PySpark masking logic is executed to replace the last four digits of "invoice_number" with "*"
+    Then the "invoice_number" column in "d_product_revenue_clone" should have the last four digits masked
+    And the masked "invoice_number" should be stored as a string
+
+  Scenario Outline: Masking various invoice_number formats
+    Given the "d_product_revenue_clone" table contains a record with "invoice_number" <invoice_number>
+    When the PySpark masking logic is executed
+    Then the "invoice_number" should be masked as <masked_invoice_number>
+
+    Examples:
+      | invoice_number | masked_invoice_number |
+      | 1234567890     | 123456****            |
+      | 987654321       | 98765****             |
+      | 1000           | ****                   |
+      | 56789          | 5****                  |
+
+  Scenario: Handle non-numeric invoice_number values
+    Given the "d_product_revenue_clone" table contains a record with "invoice_number" as a non-numeric string "INV12345"
+    When the PySpark masking logic is executed
+    Then an error "Invalid invoice_number format for masking" should be raised
+
+  Scenario: Ensure data type consistency after masking
+    Given the "d_product_revenue_clone" table has "invoice_number" as bigint
+    When the PySpark masking logic converts "invoice_number" to string for masking
+    Then the "invoice_number" column should be of type string after masking
+
+  Scenario: Failure to drop existing clone table
+    Given the table "d_product_revenue_clone" exists and cannot be dropped
+    When attempting to drop the existing "d_product_revenue_clone" table
+    Then an error "Failed to drop existing d_product_revenue_clone table" should be thrown
+
+  Scenario: Missing invoice_number column in clone table
+    Given the table "d_product_revenue_clone" does not contain the "invoice_number" column
+    When the PySpark masking logic is executed
+    Then an error "invoice_number column is missing in d_product_revenue_clone table" should be raised
