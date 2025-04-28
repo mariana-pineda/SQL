@@ -1,0 +1,47 @@
+Feature: Mask Last 4 Digits of Invoice Numbers
+
+  Background:
+    Given the table "d_product_revenue" exists
+    And the table "d_product_revenue_clone" does not exist
+    When the table "d_product_revenue" is cloned to "d_product_revenue_clone"
+
+  Scenario Outline: Masking Invoice Numbers
+    Given the "d_product_revenue_clone" table contains rows with invoice numbers
+    When the masking logic is applied to the "invoice_number" column
+    Then the last 4 digits of the "invoice_number" in "d_product_revenue_clone" are replaced with "****"
+    And the other digits of the "invoice_number" remain unchanged
+    And the data type of "invoice_number" remains <data_type>
+
+    Examples:
+      | invoice_number | data_type | expected_masked_invoice_number |
+      | "1234567890"   | string    | "123456****"                  |
+      | "1234567"     | string    | "123****"                     |
+      | "123"         | string    | "****"                        |
+      | "1234567890"   | long      | "123456****"                  | # Assuming string representation after masking
+      | "1234567"     | long      | "123****"                     | # Assuming string representation after masking
+      | "123"         | long      | "****"                        | # Assuming string representation after masking
+
+
+  Scenario: Handling Null Invoice Numbers
+    Given the "d_product_revenue_clone" table contains rows with null invoice numbers
+    When the masking logic is applied to the "invoice_number" column
+    Then the null invoice numbers remain null in the "d_product_revenue_clone" table
+
+  Scenario: Handling Empty String Invoice Numbers
+    Given the "d_product_revenue_clone" table contains rows with empty string invoice numbers
+    When the masking logic is applied to the "invoice_number" column
+    Then the empty string invoice numbers remain empty string in the "d_product_revenue_clone" table
+
+  Scenario: Handling Non-Numeric Invoice Numbers (if applicable)
+    Given the "d_product_revenue_clone" table contains rows with non-numeric invoice numbers "<invoice_number>"
+    When the masking logic is applied to the "invoice_number" column
+    Then the non-numeric invoice numbers are masked according to <masking_rule>
+
+    Examples:
+      | invoice_number | masking_rule                                                                      |
+      | "ABC1234567"  | the last 4 characters are replaced with "*" (e.g., "ABC123****")              |
+      | "123ABC456"  | an error is thrown indicating invalid invoice number format                   | # Or other specific behavior
+
+
+
+
