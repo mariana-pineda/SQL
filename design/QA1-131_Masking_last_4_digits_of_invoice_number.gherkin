@@ -1,46 +1,126 @@
-Feature: Masking last 4 digits of invoice_number in the d_product_revenue_clone table
+Feature: Mask the last 4 digits of invoice_number in d_product_revenue_clone
 
-  Background: Prepare the environment
-    Given the table purgo_playground.d_product_revenue_clone exists
-    When I drop the table purgo_playground.d_product_revenue_clone if it exists
-    Then I create a replica of purgo_playground.d_product_revenue as purgo_playground.d_product_revenue_clone
+  This feature implements logic to mask the last 4 digits of the invoice_number column in the purgo_playground.d_product_revenue_clone table using '*', in accordance with compliance policy.
+  The process involves dropping the clone table if it exists, creating a full replica from the source table (d_product_revenue), and applying masking transformation on invoice_number.
 
-  Scenario: Mask the last 4 digits of invoice_number for valid invoice numbers
-    Given the table purgo_playground.d_product_revenue_clone has data
-    When the invoice_number column contains a 10-digit number
-    Then mask the last 4 digits with asterisks
-    And store the masked value back in the invoice_number column
-    And all other columns remain unchanged
+  Background:
+    Given Unity Catalog catalog is "purgo_databricks"
+    And Unity Catalog schema is "purgo_playground"
+    And source table is "d_product_revenue"
+    And target table is "d_product_revenue_clone"
+    And target table columns are:
+      | Column                         | DataType |
+      | product_id                     | bigint   |
+      | product_name                   | string   |
+      | product_type                   | string   |
+      | revenue                        | bigint   |
+      | country                        | string   |
+      | customer_id                    | string   |
+      | purchased_date                 | date     |
+      | invoice_date                   | date     |
+      | invoice_number                 | bigint   |
+      | is_returned                    | bigint   |
+      | customer_satisfaction_score    | bigint   |
+      | product_details                | string   |
+      | customer_first_purchased_date  | date     |
+      | customer_first_product         | string   |
+      | customer_first_revenue         | double   |
 
-  Scenario: Skip masking for non-10-digit invoice numbers
-    Given the table purgo_playground.d_product_revenue_clone has data
-    When the invoice_number column does not contain a 10-digit number
-    Then do not apply any masking
-    And retain the original invoice_number
+  Scenario: Drop target table if it exists before replication
+    Given the table "purgo_playground.d_product_revenue_clone" exists
+    When the data masking workflow starts
+    Then the table "purgo_playground.d_product_revenue_clone" should be dropped
 
-  Scenario Outline: Handle null or empty invoice_number
-    Given the table purgo_playground.d_product_revenue_clone has data
-    When the invoice_number is "<value>"
-    Then set the invoice_number to null
+  Scenario: Create clone of source table with identical schema
+    Given the table "purgo_playground.d_product_revenue_clone" does not exist
+    When the data masking workflow starts
+    Then the table "purgo_playground.d_product_revenue_clone" should be created as an exact replica of "purgo_playground.d_product_revenue"
+
+  Scenario Outline: Mask the last 4 digits of invoice_number during data load
+    Given source table contains a row with invoice_number = <input_invoice_number>
+    When data is loaded into "purgo_playground.d_product_revenue_clone"
+    Then the corresponding row in "purgo_playground.d_product_revenue_clone" should have invoice_number = <expected_masked_value> as a string
 
     Examples:
-      | value |
-      | null  |
-      | ""    |
+      | input_invoice_number | expected_masked_value |
+      | 1234234534           | 123423****           |
+      | 9876543210           | 987654****           |
+      | 1234567890123        | 1234567890****       |
+      | 1234                 | ****                 |
+      | 199                  | ***                  |
+      | 8                    | *                    |
+      | 0                    | *                    |
+      | NULL                 | NULL                 |
+      | -123456              | -12****              |
 
-  Scenario: Error handling during masking operation
-    Given the table purgo_playground.d_product_revenue_clone has data
-    When a runtime error occurs during masking
-    Then log the error message "Error processing invoice_number: <error_message>"
+  Scenario: Ensure invoice_number is always a string after masking
+    Given a row is inserted with invoice_number = 12345678 (bigint)
+    When data is loaded and masking is applied
+    Then the column invoice_number must be cast to STRING type in "purgo_playground.d_product_revenue_clone"
 
-  Scenario Outline: Verify masking operation with example data
-    Given the potential invoice_number "<original_value>"
-    When masking logic is applied
-    Then the masked invoice_number should be "<masked_value>"
+  Scenario: Handle NULL invoice_number gracefully
+    Given a row in source table has invoice_number = NULL
+    When masked data is loaded
+    Then the invoice_number in target table should remain NULL
+
+  Scenario: Handle invoice_number with fewer than 4 digits
+    Given a row in source table has invoice_number = <input_invoice_number>
+    When masked data is loaded
+    Then the invoice_number in target table should be <expected_masked_value>
 
     Examples:
-      | original_value | masked_value |
-      | 1234234534     | 123423****   |
-      | 9876543210     | 987654****   |
-      | 1111222233     | 111122****   |
+      | input_invoice_number | expected_masked_value |
+      | 123                  | ***                  |
+      | 1                    | *                    |
+      | 0                    | *                    |
 
+  Scenario: Mask negative invoice_number values
+    Given a row in source table has invoice_number = <input_invoice_number>
+    When masked data is loaded
+    Then the invoice_number in target table should be <expected_masked_value>
+
+    Examples:
+      | input_invoice_number | expected_masked_value |
+      | -5321                | -****                |
+      | -75                  | -**                  |
+      | -9999                | -****                |
+      | -10001               | -100**               |
+
+  Scenario: Validate error if invoice_number exceeds valid bigint range
+    Given a row in source table has invoice_number = 92233720368547758070
+    When data is loaded
+    Then an error should be raised with message "invoice_number value exceeds valid bigint range"
+
+  Scenario: Retain all other column values without modification
+    Given a row in source table with product_id = 999, product_name = "Demo", revenue = 5000, and invoice_number = 3456789
+    When data is loaded into clone table with masking flow
+    Then in target table, product_id = 999, product_name = "Demo", revenue = 5000, and invoice_number = 345***, with all other columns unchanged
+
+  Scenario: Overwrite behavior on every pipeline run
+    Given "purgo_playground.d_product_revenue_clone" has prior data
+    When the masking workflow is triggered
+    Then existing contents in "purgo_playground.d_product_revenue_clone" should be replaced with newly masked and loaded data from source table with full overwrite
+
+  Scenario: Restrict masking and overwrite logic only to d_product_revenue_clone
+    Given tables with similar columns exist in "purgo_playground"
+    When the masking workflow is triggered
+    Then only "purgo_playground.d_product_revenue_clone" table should be dropped, re-created, and loaded
+
+  Scenario: Raise error if table drop fails due to permissions
+    Given user does not have DROP TABLE privileges on "purgo_playground.d_product_revenue_clone"
+    When the masking workflow starts
+    Then an error message "Insufficient permissions to drop d_product_revenue_clone" should be raised
+
+  Scenario: Masking logic does not impact source table data
+    Given data in "purgo_playground.d_product_revenue"
+    When the masking workflow completes
+    Then original values in "purgo_playground.d_product_revenue" table, including invoice_number, remain unchanged
+
+  Scenario: Ensure masked values conform to the following validation rules
+    Given the pipeline has loaded data into clone table
+    Then each value in invoice_number must match:
+      | Rule                                                   |
+      | If invoice_number is NULL, output is NULL              |
+      | If abs(invoice_number) >= 4 digits, last 4 replaced by '*' |
+      | If abs(invoice_number) < 4 digits, all digits replaced by '*' per digit |
+      | Output is always string type, retains sign if negative |
