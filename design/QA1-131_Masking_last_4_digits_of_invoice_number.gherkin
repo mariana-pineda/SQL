@@ -1,56 +1,46 @@
-Feature: Mask invoice numbers in purgo_playground.d_product_revenue_clone
+Feature: Masking last 4 digits of invoice_number in the d_product_revenue_clone table
 
-  Background:
-    Given the purgo_playground.d_product_revenue table exists
-    And the purgo_playground.d_product_revenue_clone table does not exist
+  Background: Prepare the environment
+    Given the table purgo_playground.d_product_revenue_clone exists
+    When I drop the table purgo_playground.d_product_revenue_clone if it exists
+    Then I create a replica of purgo_playground.d_product_revenue as purgo_playground.d_product_revenue_clone
 
-  Scenario: Create a replica of d_product_revenue and apply masking
-    Given the table purgo_playground.d_product_revenue_clone does not exist
-    When I create the purgo_playground.d_product_revenue_clone table as a replica of purgo_playground.d_product_revenue
-    Then the table purgo_playground.d_product_revenue_clone should be created successfully
+  Scenario: Mask the last 4 digits of invoice_number for valid invoice numbers
+    Given the table purgo_playground.d_product_revenue_clone has data
+    When the invoice_number column contains a 10-digit number
+    Then mask the last 4 digits with asterisks
+    And store the masked value back in the invoice_number column
+    And all other columns remain unchanged
 
-  Scenario Outline: Mask the last 4 digits of invoice numbers
-    Given the invoice_number column in the purgo_playground.d_product_revenue_clone table
-    When masking is applied
-    Then the invoice_number should show <masked_result>
+  Scenario: Skip masking for non-10-digit invoice numbers
+    Given the table purgo_playground.d_product_revenue_clone has data
+    When the invoice_number column does not contain a 10-digit number
+    Then do not apply any masking
+    And retain the original invoice_number
 
-    Examples:
-      | original_invoice_number | masked_result |
-      | 1234234534              | 123423****    |
-      | 9823423455              | 982342****    |
-
-  Scenario: Handle incorrect invoice number format error
-    Given the invoice_number column contains an incorrect format
-    When masking is applied
-    Then an error message "Invalid invoice number format" should be produced
-
-  Scenario: Validation for masking operation
-    Given the invoice_number column contains numbers with 10 digits
-    When masking operation starts
-    Then the format should remain 10 characters long
-
-  Scenario Outline: Validate incorrect invoice number length
-    Given an invoice number <invoice_number>
-    When the length is less than 10 characters
-    Then an error message "Invoice number is too short" should be produced
+  Scenario Outline: Handle null or empty invoice_number
+    Given the table purgo_playground.d_product_revenue_clone has data
+    When the invoice_number is "<value>"
+    Then set the invoice_number to null
 
     Examples:
-      | invoice_number |
-      | 12345          |
-      | 678934         |
+      | value |
+      | null  |
+      | ""    |
 
-  Scenario: Verify masking on multiple records
-    Given multiple invoice numbers in the purgo_playground.d_product_revenue_clone table
-    When I apply the masking logic to each record
-    Then all invoice numbers should have their last 4 digits masked properly
+  Scenario: Error handling during masking operation
+    Given the table purgo_playground.d_product_revenue_clone has data
+    When a runtime error occurs during masking
+    Then log the error message "Error processing invoice_number: <error_message>"
 
-Technical Details:
-  Given the Spark version is 3.1.1
-  And using Databricks environment
-  Validation rules include ensuring column exists, masking is within limits, and accurate masking of only last 4 digits
-  Error conditions encompassed:
-    - Invalid format check
-    - Minimum length check
-  Error messages:
-    - "Invalid invoice number format"
-    - "Invoice number is too short"
+  Scenario Outline: Verify masking operation with example data
+    Given the potential invoice_number "<original_value>"
+    When masking logic is applied
+    Then the masked invoice_number should be "<masked_value>"
+
+    Examples:
+      | original_value | masked_value |
+      | 1234234534     | 123423****   |
+      | 9876543210     | 987654****   |
+      | 1111222233     | 111122****   |
+
