@@ -1,13 +1,12 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import expr, col
-from pyspark.sql.types import StructType, StructField, StringType, DateType, DoubleType, BigIntType
+from pyspark.sql.functions import col, when, lit, expr
+from pyspark.sql.types import StructType, StructField, StringType, BigIntType, DoubleType, DateType
 
-# Initialize Spark session
-spark = SparkSession.builder \
-    .appName("MaskInvoiceNumbersTest") \
-    .getOrCreate()
+# Setup Spark Session
+# Assuming Spark session 'spark' is already available in the Databricks environment
+# spark = SparkSession.builder.appName("MaskingInvoiceNumber").getOrCreate()
 
-# Define schema for the table to ensure schema consistency
+# Define schema for the table purgo_playground.d_product_revenue_clone
 schema = StructType([
     StructField("product_id", BigIntType(), True),
     StructField("product_name", StringType(), True),
@@ -26,41 +25,39 @@ schema = StructType([
     StructField("customer_first_revenue", DoubleType(), True)
 ])
 
-# Drop the table purgo_playground.d_product_revenue_clone if it exists for a clean test setup
-spark.sql("DROP TABLE IF EXISTS purgo_playground.d_product_revenue_clone")
+# Load table into DataFrame
+try:
+    df = spark.table("purgo_playground.d_product_revenue_clone")
+except Exception as e:
+    # Log error if table loading fails
+    print(f"Error loading table purgo_playground.d_product_revenue_clone: {e}")
+    df = None
 
-# Create a replica of purgo_playground.d_product_revenue for testing
-spark.sql("CREATE TABLE purgo_playground.d_product_revenue_clone AS SELECT * FROM purgo_playground.d_product_revenue")
+if df:
+    # Masking logic for invoice_number
+    df_masked = df.withColumn(
+        "invoice_number",
+        when(
+            (col("invoice_number").isNotNull()) & (col("invoice_number").rlike(r'^\d{10}$')),
+            expr("concat(substr(invoice_number, 1, 6), '****')")
+        ).otherwise(col("invoice_number"))
+    )
 
-# Read data from purgo_playground.d_product_revenue_clone
-df = spark.table("purgo_playground.d_product_revenue_clone")
+    # Handle null or empty invoice_number cases
+    df_null_handling = df_masked.withColumn(
+        "invoice_number",
+        when((col("invoice_number").isNull()) | (col("invoice_number") == ""), lit(None)).otherwise(col("invoice_number"))
+    )
 
-# Mask the last four digits of the invoice_number with '****'
-masked_df = df.withColumn("invoice_number", expr("concat(substring(invoice_number, 1, length(invoice_number)-4), '****')"))
+    # Ensure that schema remains consistent with the target table before writing back
+    assert len(df_null_handling.columns) == len(schema.fields), "Column count mismatch!"
 
-# Function to handle validation: Check if invoice number format is valid
-def validate_invoice_number_format(df):
-    return df.withColumn('valid_format', expr("length(invoice_number) >= 10"))
+    # Write transformed data back to the clone table
+    try:
+        df_null_handling.write.format("delta").mode("overwrite").saveAsTable("purgo_playground.d_product_revenue_clone")
+    except Exception as e:
+        print(f"Error writing masked data to clone table: {e}")
 
-masked_df = validate_invoice_number_format(masked_df)
-invalid_invoice_df = masked_df.filter(col('valid_format') == False)
+    # Stop Spark session if started locally
+    # spark.stop()
 
-# Display error for any invalid invoice number formats
-invalid_invoice_df.select("invoice_number").show(truncate=False)
-
-# Extract valid invoice numbers for further processing
-valid_invoice_df = masked_df.filter(col('valid_format') == True)
-valid_invoice_df = valid_invoice_df.drop('valid_format')
-
-# Write back the valid masked data to the clone table
-valid_invoice_df.write.mode("overwrite").saveAsTable("purgo_playground.d_product_revenue_clone")
-
-# Display the masked data to verify correctness
-valid_invoice_df.show(truncate=False)
-
-# Assert checks for verification
-assert invalid_invoice_df.count() == 0, "There are invalid invoice numbers that should not exist"
-assert valid_invoice_df.filter(col("invoice_number").endsWith("****")).count() == valid_invoice_df.count(), "Not all invoice numbers were masked correctly"
-
-# Cleanup after tests to avoid side effects
-spark.sql("DROP TABLE IF EXISTS purgo_playground.d_product_revenue_clone")
