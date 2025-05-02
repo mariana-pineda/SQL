@@ -1,13 +1,11 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import expr, col
-from pyspark.sql.types import StructType, StructField, StringType, DateType, DoubleType, BigIntType
+from pyspark.sql.functions import col, when, lit
+from pyspark.sql.types import StructType, StructField, StringType, BigIntType, DoubleType, DateType
 
-# Initialize Spark session
-spark = SparkSession.builder \
-    .appName("MaskInvoiceNumbers") \
-    .getOrCreate()
+# Create Spark session
+spark = SparkSession.builder.appName("TestDataGeneration").getOrCreate()
 
-# Define schema for the table
+# Define schema for `d_product_revenue_clone` table
 schema = StructType([
     StructField("product_id", BigIntType(), True),
     StructField("product_name", StringType(), True),
@@ -26,35 +24,39 @@ schema = StructType([
     StructField("customer_first_revenue", DoubleType(), True)
 ])
 
-# Drop the table purgo_playground.d_product_revenue_clone if it exists
-spark.sql("DROP TABLE IF EXISTS purgo_playground.d_product_revenue_clone")
+# Generate test data
+test_data = [
+    (1001, "ProductA", "Type1", 5000, "USA", "C001", None, None, "1234234534", 0, 85, "DetailsA", None, "FirstProductA", 300.0),
+    (1002, "ProductB", "Type2", 10000, "CAN", "C002", None, None, "9876543210", 1, 90, "DetailsB", None, "FirstProductB", 450.5),
+    (1003, "ProductC", "Type3", 1500, "MEX", "C003", None, None, "1111222233", 0, 70, "DetailsC", None, "FirstProductC", 150.75),
+    (1004, "ProductD", "Type1", 2500, "USA", "C004", None, None, None, 0, 95, "DetailsD", None, "FirstProductD", 200.25),
+    (1005, "ProductE", "Type2", 3000, "CAN", "C005", None, None, "", 1, 88, "DetailsE", None, "FirstProductE", 500.5),
+    # Add more test data as needed
+]
 
-# Create a replica of purgo_playground.d_product_revenue
-spark.sql("CREATE TABLE purgo_playground.d_product_revenue_clone AS SELECT * FROM purgo_playground.d_product_revenue")
+# Create DataFrame using test data
+df = spark.createDataFrame(test_data, schema)
 
-# Read data from purgo_playground.d_product_revenue_clone
-df = spark.table("purgo_playground.d_product_revenue_clone")
+# Masking logic for invoice_number
+df_masked = df.withColumn(
+    "invoice_number",
+    when(
+        (col("invoice_number").isNotNull()) & (col("invoice_number").rlike(r'^\d{10}$')),
+        col("invoice_number").substr(1, 6).concat(lit('****'))
+    ).otherwise(col("invoice_number"))
+)
 
-# Mask the last 4 digits of the invoice_number with '****'
-masked_df = df.withColumn("invoice_number", expr("concat(substring(invoice_number, 1, length(invoice_number)-4), '****')"))
+# Show the masked DataFrame for verification
+df_masked.show()
 
-# Handle invalid invoice number cases (too short, incorrect format)
-def validate_invoice_number(df):
-    return df.withColumn('valid_format', expr("length(invoice_number) >= 10"))
+# Handle null or empty invoice_number
+df_null_handling = df_masked.withColumn(
+    "invoice_number",
+    when((col("invoice_number").isNull()) | (col("invoice_number") == ""), lit(None)).otherwise(col("invoice_number"))
+)
 
-masked_df = validate_invoice_number(masked_df)
-invalid_invoice_df = masked_df.filter(col('valid_format') == False)
+# Output the final result to verify null handling and data integrity
+df_null_handling.show()
 
-# Display error message for invalid numbers
-invalid_invoice_df.select("invoice_number").show(truncate=False)
-
-# Show valid data
-valid_invoice_df = masked_df.filter(col('valid_format') == True)
-valid_invoice_df = valid_invoice_df.drop('valid_format')
-
-# Write back the masked data to the clone table
-valid_invoice_df.write.mode("overwrite").saveAsTable("purgo_playground.d_product_revenue_clone")
-
-# Display the masked data
-valid_invoice_df.show(truncate=False)
-
+# Stop the Spark session
+spark.stop()
