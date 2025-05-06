@@ -1,0 +1,73 @@
+
+  This feature masks the last 4 digits of the invoice_number column in the d_product_revenue_clone table by replacing them with asterisks ('*'), as per data protection requirements. All other columns remain unchanged. Input and output data validation, error handling, and compliance with catalog/table access are also covered.
+
+  Background:
+    Given the source table "purgo_playground.d_product_revenue" exists
+    And the source table contains a column "invoice_number" of STRING data type
+    And the source table contains valid invoice numbers of various lengths (minimum 4 digits)
+    And the user has necessary write and drop privileges on "purgo_playground.d_product_revenue_clone"
+  
+  Scenario: Drop the d_product_revenue_clone table if it exists
+    Given the table "purgo_playground.d_product_revenue_clone" exists
+    When the PySpark logic is executed
+    Then the table "purgo_playground.d_product_revenue_clone" should not exist prior to table creation
+
+  Scenario: Create replica table d_product_revenue_clone from d_product_revenue
+    Given the table "purgo_playground.d_product_revenue_clone" does not exist
+    When the PySpark logic is executed
+    Then a new table "purgo_playground.d_product_revenue_clone" should be created with the same schema as "purgo_playground.d_product_revenue"
+
+  Scenario Outline: Mask last 4 digits of invoice_number column with '*'
+    Given the invoice_number value in the source table is "<source_invoice_number>"
+    When the masking PySpark logic is applied
+    Then the value in "purgo_playground.d_product_revenue_clone.invoice_number" should be "<masked_invoice_number>"
+
+    Examples:
+      | source_invoice_number | masked_invoice_number |
+      | 1234234534           | 123423****            |
+      | 9876                 | ****                  |
+      | 56789012             | 5678****              |
+      | 399988367           | 39998****             |
+
+  Scenario Outline: Masking with short invoice_number (less than 4 digits triggers error)
+    Given the invoice_number value in the source table is "<source_invoice_number>"
+    When the masking logic is executed
+    Then an error should be raised with message "invoice_number length must be at least 4 digits"
+
+    Examples:
+      | source_invoice_number |
+      | 123                  |
+      | 9                    |
+      | 0                    |
+
+  Scenario: Data type validation for invoice_number input
+    Given the invoice_number value is non-string or NULL
+    When the masking logic is executed
+    Then an error should be raised with message "invoice_number must be a non-null STRING value"
+
+  Scenario: No changes to other columns when masking invoice_number
+    Given a row in the source table with invoice_number "<source_invoice_number>" and other columns with values "<col_values>"
+    When the PySpark logic is executed
+    Then the corresponding row in d_product_revenue_clone must have masked invoice_number "<masked_invoice_number>" and all other columns equal to "<col_values>"
+
+    Examples:
+      | source_invoice_number | masked_invoice_number | col_values                                |
+      | 1234234534           | 123423****            | {"product_id": 9231, "amount": 99.00}     |
+      | 9876                 | ****                  | {"product_id": 8782, "amount": 115.7}     |
+
+  Scenario: Access restriction error on Unity Catalog
+    Given the user lacks DROP or CREATE privileges on "purgo_playground.d_product_revenue_clone"
+    When the PySpark logic is executed
+    Then an error message is returned "Permission denied for DROP or CREATE on table purgo_playground.d_product_revenue_clone"
+
+  Scenario Outline: Validate masked values do not contain digits in last 4 characters
+    Given the invoice_number in d_product_revenue_clone is "<masked_invoice_number>"
+    When examining the last 4 characters of the field
+    Then all characters in the last 4 positions must be "*"
+
+    Examples:
+      | masked_invoice_number |
+      | 123423****           |
+      | ****                 |
+      | 5678****             |
+      | 39998****            |
