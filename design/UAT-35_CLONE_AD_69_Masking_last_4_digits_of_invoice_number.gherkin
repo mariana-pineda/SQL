@@ -1,0 +1,61 @@
+Feature: Mask invoice_number in d_product_revenue_clone table
+
+  Background:
+    Given the schema for the d_product_revenue table includes invoice_number as a string
+
+  Scenario Outline: Mask invoice_number for valid cases
+    Given the invoice_number is "<invoice_number>"
+    When the masking logic is applied
+    Then the masked invoice_number should be "<expected_masked_number>"
+    
+    Examples:
+      | invoice_number | expected_masked_number |
+      | 1234234534     | 123423****             |
+      | 5678901234     | 567890****             |
+      | 8910111213     | 891011****             |
+
+  Scenario Outline: Handle short invoice_numbers
+    Given the invoice_number is "<invoice_number>"
+    When checking the length of the invoice_number
+    Then the invoice_number should be unchanged "<expected_output>"
+    
+    Examples:
+      | invoice_number | expected_output |
+      | 123            | 123             |
+      | 45             | 45              |
+      | null           | null            |
+
+  Scenario Outline: Handle alphanumeric invoice_numbers
+    Given the invoice_number is "<invoice_number>"
+    When applying masking to alphanumeric invoice_number
+    Then the masked invoice_number should be "<expected_masked_number>"
+    
+    Examples:
+      | invoice_number | expected_masked_number |
+      | ABC1234567     | ABC123****             |
+      | ZYX0987654     | ZYX098****             |
+
+  Scenario: Drop existing d_product_revenue_clone table
+    Given the d_product_revenue_clone table exists in the schema
+    When the table is dropped if it exists
+    Then there should be no d_product_revenue_clone table present
+
+  Scenario: Clone and apply masking
+    Given the d_product_revenue table exists
+    When a replica is created as d_product_revenue_clone
+    Then the invoice_number column should be masked with the last 4 digits replaced by '*'
+
+  Scenario: Validate error condition for schema mismatch
+    Given the schema for d_product_revenue and d_product_revenue_clone are provided
+    When checking the schema consistency
+    Then an error message should display "Schema mismatch detected." if inconsistent
+
+  Scenario: Save clone table in specified format
+    Given the required storage format for d_product_revenue_clone is Delta
+    When the data is written to disk
+    Then the d_product_revenue_clone table should be saved in Delta format
+
+  Scenario: Error handling for unsupported data types
+    Given the invoice_number contains non-string values
+    When attempting to apply masking
+    Then an error message "Unsupported invoice number format." should be returned
