@@ -1,0 +1,65 @@
+Feature: SQL logic for f_invntry_bal_dly_hist data population
+
+  Background:
+    Given the driving table is item_qty_on_hand
+    And left outer join itemledgerentrieswopd on trimmed item_no_ and location_code
+    And left outer join reservation_entry on trimmed item_no_ and location_code
+    And left outer join sap_master_data on item_no_ and no_ from itemwopd
+    And left outer join Itemwopd on item_no_ and no_ from item_qty_on_hand
+
+  Scenario Outline: Populating f_invntry_bal_dly_hist table with valid data
+    Given the latest posting_date from itemledgerentrieswopd based on item_no_ and location_code
+    And reservation_status is '0' and source_type is '37' from reservation_entry
+    When the g_account is fetched from sap_master_data
+    And the g_assignment_type is hardcoded to 'Account'
+    And the g_capture_dt_yyyymmdd is set to current date
+    And the g_company_cd is hardcoded to '1050'
+    And the g_company_currency_cd is hardcoded to 'EUR'
+    And the g_dnsa_dt_yyyymmdd uses default Expiration_Date from itemledgerentrieswopd
+    And the g_expiration_dt_yyyymmdd defaults to '99991231'
+    And the g_item_nbr is unique and fetched from itemledgerentrieswopd
+    And the g_location_cd is fetched from itemledgerentrieswopd
+    And the g_location_status_cd is hardcoded to 'none'
+    And the g_lot_effective_dt_yyyymmdd defaults to Posting_Date, using '19000101' if unrepresented
+    And the g_lot_nbr fetched from itemledgerentrieswopd uses 'none' for blank spaces
+    And the g_lot_status_cd is hardcoded to 'none'
+    And the g_plant_cd is hardcoded to 'CAGER'
+    And the g_qty_allocated calculated from reservation_entry's quantity_base, negating if necessary
+    And the g_qty_available is populated only if location_code in ('HAUPT', 'GERMERING', 'LIN', 'MATRIUM')
+    And the g_qty_financial_nettable is populated from qty_on_hand with specified location codes
+    And the g_qty_in_transit is hardcoded to NULL
+    And the g_qty_mrp_nettable is populated under specific location conditions
+    And the g_qty_on_hand is fetched from item_qty_on_hand
+    And the g_qty_shippable is populated for location_code = 'HAUPT'
+    And the g_source_system_cd is hardcoded to 'nav_ger'
+    And the g_unit_cost_company_currency is fetched from Itemwopd's Standard_Cost
+    Then concatenate co_key as source_system_cd and g_company_cd
+    And concatenate plant_key as source_system_cd and g_plant_cd
+    And concatenate plant_location_key as source_system_cd, g_plant_cd, g_location_cd
+    And concatenate prod_key as source_system_cd and g_item_nbr
+    And concatenate prod_plant_key as source_system_cd, g_item_nbr, and g_plant_cd
+    And concatenate prod_plant_location_key as source_system_cd, g_item_nbr, g_plant_cd, g_location_cd
+    And concatenate prod_plant_lot_key as source_system_cd, g_item_nbr, g_plant_cd, g_lot_nbr
+    And concatenate prod_plant_lot_location_key as source_system_cd, g_item_nbr, g_plant_cd, g_lot_nbr, g_location_cd
+
+  Examples:
+    | location_code | item_no_ | quantity_base |
+    | HAUPT         | ITEM1    | 100           |
+    | GERMERING     | ITEM2    | -50           |
+    | LIN           | ITEM3    | 75            |
+    | AH-LOC1       | ITEM4    | 200           |
+
+  Scenario Outline: Error handling for f_invntry_bal_dly_hist data population
+    Given an invalid location_code
+    When trying to populate g_qty_available
+    Then throw an error "Invalid Location Code for g_qty_available"
+
+    Given a missing item_no_
+    When attempting to fetch g_item_nbr
+    Then log warning "Missing item_no_ in itemledgerentrieswopd"
+
+    Examples:
+    | location_code | item_no_  |
+    | UNKNOWN       | ITEM5     |
+    | HAUPT         | NULL      |
+
