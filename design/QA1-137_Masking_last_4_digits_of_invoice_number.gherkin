@@ -1,0 +1,47 @@
+
+  Background:
+    Given a Databricks environment with PySpark setup
+    And d_product_revenue table exists with invoice_number column
+
+  Scenario: Drop the d_product_revenue_clone table if it exists
+    Given d_product_revenue_clone table exists
+    When the table is dropped
+    Then d_product_revenue_clone table should not exist
+
+  Scenario: Create a replica of d_product_revenue table in d_product_revenue_clone table
+    Given d_product_revenue table exists
+    When a replica of d_product_revenue is created in d_product_revenue_clone
+    Then d_product_revenue_clone should have the same structure as d_product_revenue
+
+  Scenario: Mask the last 4 digits of invoice_number in d_product_revenue_clone
+    Given d_product_revenue_clone table is available
+    And invoice_number column contains numeric values with at least 10 digits
+    When last 4 digits of invoice_number are replaced with '****'
+    Then invoice_number in d_product_revenue_clone should end with '****'
+    Examples:
+      | invoice_number  | masked_invoice_number |
+      | 1234234534      | 123423****            |
+      | 9876543210      | 987654****            |
+
+  Scenario: Handle error when invoice_number is less than 10 digits
+    Given invoice_number has less than 10 digits
+    When the masking logic is applied
+    Then an error condition should trigger with message "Invalid invoice_number format"
+    Examples:
+      | invoice_number |
+      | 12345          |
+      | 6789           |
+
+  Scenario: Ensure data type consistency
+    Given invoice_number is numeric
+    When masked
+    Then ensure the data type remains consistent with pre-masking format
+
+  Scenario Outline: Test multiple invoice_number formats
+    Given invoice_number with <format> format
+    When masked
+    Then invoice_number should end with '****'
+    Examples:
+      | format | invoice_number  | masked_invoice_number |
+      | numeric | 1111222233      | 111122****            |
+      | numeric | 4444555566      | 444455****            |
