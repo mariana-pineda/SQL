@@ -1,47 +1,40 @@
+Feature: Mask last 4 digits of invoice_number in the d_product_revenue_clone table
 
   Background:
-    Given a Databricks environment with PySpark setup
-    And d_product_revenue table exists with invoice_number column
+    Given the d_product_revenue table exists in the database
+    And the d_product_revenue_clone table is dropped if it exists
+    And a replica of the d_product_revenue is created as d_product_revenue_clone
 
-  Scenario: Drop the d_product_revenue_clone table if it exists
-    Given d_product_revenue_clone table exists
-    When the table is dropped
-    Then d_product_revenue_clone table should not exist
+  Scenario: Successfully mask the last 4 digits of the invoice_number
+    Given the invoice_number column contains numeric values
+    When the PySpark logic is executed
+    Then the last four digits of each invoice_number should be masked with '****'
+    And the masked invoice_number is saved in the d_product_revenue_clone table
 
-  Scenario: Create a replica of d_product_revenue table in d_product_revenue_clone table
-    Given d_product_revenue table exists
-    When a replica of d_product_revenue is created in d_product_revenue_clone
-    Then d_product_revenue_clone should have the same structure as d_product_revenue
+  Scenario: Attempt to mask with invalid data type in invoice_number column
+    Given the invoice_number column contains non-numeric values
+    When the PySpark logic is executed
+    Then an error message is displayed "Invalid data type in invoice_number column"
+    And no changes should be made to the d_product_revenue_clone table
 
-  Scenario: Mask the last 4 digits of invoice_number in d_product_revenue_clone
-    Given d_product_revenue_clone table is available
-    And invoice_number column contains numeric values with at least 10 digits
-    When last 4 digits of invoice_number are replaced with '****'
-    Then invoice_number in d_product_revenue_clone should end with '****'
+  Scenario Outline: Data-driven tests for masking invoice_number
+    Given the invoice_number column contains the value <original_value>
+    When the PySpark logic is executed
+    Then the stored invoice_number should be <masked_value>
+
     Examples:
-      | invoice_number  | masked_invoice_number |
-      | 1234234534      | 123423****            |
-      | 9876543210      | 987654****            |
+      | original_value | masked_value |
+      | 1234234534     | 123423****   |
+      | 5678123412     | 567812****   |
+      | 9876543210     | 987654****   |
 
-  Scenario: Handle error when invoice_number is less than 10 digits
-    Given invoice_number has less than 10 digits
-    When the masking logic is applied
-    Then an error condition should trigger with message "Invalid invoice_number format"
-    Examples:
-      | invoice_number |
-      | 12345          |
-      | 6789           |
+  Scenario: No modification if d_product_revenue_clone is empty
+    Given the d_product_revenue_clone table is empty
+    When the PySpark logic is executed
+    Then no changes should be made and table remains empty
 
-  Scenario: Ensure data type consistency
-    Given invoice_number is numeric
-    When masked
-    Then ensure the data type remains consistent with pre-masking format
-
-  Scenario Outline: Test multiple invoice_number formats
-    Given invoice_number with <format> format
-    When masked
-    Then invoice_number should end with '****'
-    Examples:
-      | format | invoice_number  | masked_invoice_number |
-      | numeric | 1111222233      | 111122****            |
-      | numeric | 4444555566      | 444455****            |
+  Scenario: Verify error message for restricted access
+    Given insufficient permissions for modifying the d_product_revenue_clone table
+    When the PySpark logic is executed
+    Then an error message is displayed "Access denied to d_product_revenue_clone table"
+    And no changes should be made to the table
