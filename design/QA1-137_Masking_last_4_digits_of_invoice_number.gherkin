@@ -1,103 +1,72 @@
 
-  This feature ensures the last 4 digits of the invoice_number column in the d_product_revenue_clone table (replica of d_product_revenue) are masked using ‘*’, meeting compliance requirements for customer information protection.
+  As a Data Engineer,
+  I want to mask the last 4 digits of the invoice_number column in the d_product_revenue_clone table
+  So that sensitive customer invoice information is protected in compliance with data masking policies.
 
   Background:
     Given Unity Catalog is "purgo_databricks"
     And Unity Catalog Schema is "purgo_playground"
-    And source table is "purgo_databricks.purgo_playground.d_product_revenue"
-    And destination table is "purgo_databricks.purgo_playground.d_product_revenue_clone"
-    And user has write permissions on both tables
-    And environment is Databricks with PySpark version compatible with masking logic
-    And the d_product_revenue table has a column invoice_number with String or Numeric data type
+    And I have access permissions to drop, create, and update tables in the schema
+    And the source table "d_product_revenue" exists in schema "purgo_playground"
+    And the "invoice_number" column is of datatype STRING and contains only numeric values of 10 digits
 
-  Scenario: Drop and create clone of d_product_revenue table
-    Given the table d_product_revenue_clone exists
-    When the table d_product_revenue_clone is dropped
-    Then no table named d_product_revenue_clone should exist in schema purgo_playground
-    When a clone of d_product_revenue is created as d_product_revenue_clone
-    Then d_product_revenue_clone should exist with identical schema as d_product_revenue
+  Scenario: Drop the existing d_product_revenue_clone table if it exists
+    Given table "d_product_revenue_clone" exists in schema "purgo_playground"
+    When I execute the drop table statement for "d_product_revenue_clone"
+    Then "d_product_revenue_clone" should not exist in schema "purgo_playground"
 
-  Scenario Outline: Mask last 4 digits of invoice_number with ‘*’
-    Given d_product_revenue_clone contains the following invoice_number values:
-      | invoice_number |
-      | <original_invoice_number> |
-    When the masking process is executed on invoice_number column
-    Then the stored invoice_number should be "<masked_invoice_number>"
+  Scenario: Create a replica of d_product_revenue as d_product_revenue_clone
+    Given table "d_product_revenue_clone" does not exist in schema "purgo_playground"
+    When I create "d_product_revenue_clone" as a replica of "d_product_revenue"
+    Then "d_product_revenue_clone" must have the same schema and data as "d_product_revenue"
 
-    Examples:
-      | original_invoice_number | masked_invoice_number |
-      | 1234234534             | 123423****           |
-      | 987654321098           | 98765432****         |
-      | AB12345678             | AB1234****           |
-      | 8765                   | ****                 |
-      | 543                    | ***                  |
-      | XY12                   | ****                 |
-      | 1                      | *                    |
-      | 000012340000           | 00001234****         |
-      | 12AB34XY56             | 12AB34XY**           |
-
-  Scenario Outline: Error handling for null or invalid invoice_number values
-    Given d_product_revenue_clone contains the following invoice_number:
-      | invoice_number |
-      | <invalid_invoice_number> |
-    When the masking process is executed on invoice_number column
-    Then the following error condition should be triggered with message "<error_message>"
+  Scenario Outline: Mask the last 4 digits of invoice_number with '*'
+    Given d_product_revenue_clone contains an invoice_number with value "<original_invoice_number>"
+    When I apply the masking PySpark logic to the invoice_number column
+    Then the value of invoice_number becomes "<expected_masked_number>"
 
     Examples:
-      | invalid_invoice_number | error_message                               |
-      | NULL                  | "invoice_number is NULL: cannot mask value" |
-      |                      | "invoice_number is empty: cannot mask value" |
-      | @#$%^&*()            | "invoice_number contains only special characters: masking all as *"|
+      | original_invoice_number | expected_masked_number |
+      | 1234234534              | 123423****            |
+      | 5555666677              | 555566****            |
+      | 9876543210              | 987654****            |
+      | 9999999999              | 999999****            |
 
-  Scenario Outline: Validation rules for masking invoice_number
-    Given an invoice_number value <test_value>
-    When the masking logic is applied
-    Then the result should satisfy the following rules:
-      | rule_description                                   |
-      | If length >= 4, mask last 4 chars as '*'           |
-      | If length < 4, mask all chars as '*'               |
-      | If value contains alphanumeric or numeric, mask chars only, preserve format |
-      | If value is NULL or empty, do not mask, set to error or log error    |
+  Scenario Outline: Handle invoice_number values shorter than 4 digits
+    Given d_product_revenue_clone contains an invoice_number with value "<short_invoice_number>"
+    When I apply the masking PySpark logic to the invoice_number column
+    Then the value of invoice_number becomes "<expected_masked_short_number>"
 
     Examples:
-      | test_value          |
-      | 123456789          |
-      | AB1234CD           |
-      | 123                |
-      |                    |
-      | NULL               |
-      | A                  |
-      | 1234               |
-      | ABCD               |
+      | short_invoice_number | expected_masked_short_number |
+      | 123                 | ***                          |
+      | 45                  | **                           |
+      | 9                   | *                            |
+      |                     |                              |
 
-  Scenario: Ensure masked invoice_number format is preserved and no data loss
-    Given d_product_revenue_clone table has invoice_number values before masking
-    When the masking logic is run
-    Then all other columns should remain unchanged
-    And only the last 4 characters of invoice_number are replaced with '*'
-    And all invoice_number field lengths remain unchanged
-
-  Scenario: Logging and auditing of masking process
-    Given the masking process is initiated
-    When a value is masked or an error occurs
-    Then an entry is added to the audit log with timestamp, original value, masked value (if masked), and error message (if error occurs)
-
-  Scenario: Masking should be idempotent
-    Given an invoice_number value already masked (last 4 are '*')
-    When the masking logic runs again
-    Then the invoice_number remains unchanged
-    And no additional masking is applied
-
-  Scenario Outline: Masking on edge case inputs
-    Given the following invoice_number test case: <edge_case_value>
-    When the masking process is executed
-    Then the resulting invoice_number is <edge_case_result>
-    And any relevant error/warning is <edge_case_error>
+  Scenario Outline: Handle non-numeric or invalid format in invoice_number
+    Given d_product_revenue_clone contains an invoice_number with value "<invalid_invoice_number>"
+    When I apply the masking PySpark logic to the invoice_number column
+    Then an error is raised with message "<expected_error_message>"
 
     Examples:
-      | edge_case_value | edge_case_result | edge_case_error                            |
-      | 12              | **               |                                            |
-      |                 |                  | "invoice_number is empty: cannot mask value"|
-      | NULL            |                  | "invoice_number is NULL: cannot mask value" |
-      | ****            | ****             |                                            |
-      |   1234          |   ****           |                                            |
+      | invalid_invoice_number | expected_error_message                                      |
+      | 12A3456789            | Invalid invoice_number: non-numeric characters detected     |
+      | 1234-56789            | Invalid invoice_number: special characters detected         |
+      | NULL                  | Invalid invoice_number: value is null                      |
+
+  Scenario: Validate the masking transformation for all rows in d_product_revenue_clone
+    Given table "d_product_revenue_clone" contains N rows
+    When I execute the masking logic on all rows
+    Then all invoice_number values must have their last 4 characters masked with '*'
+    And the total row count should remain N
+
+  Scenario: Error when source table d_product_revenue does not exist
+    Given table "d_product_revenue" does not exist in schema "purgo_playground"
+    When I attempt to create a replica table
+    Then an error message "Source table d_product_revenue not found in schema purgo_playground" is returned
+
+  Scenario: Error when lacking permissions to drop or create tables
+    Given I do not have DROP or CREATE permissions on schema "purgo_playground"
+    When I attempt to drop or create a table
+    Then an error message "Insufficient permissions to alter tables in schema purgo_playground" is returned
