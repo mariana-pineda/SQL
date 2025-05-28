@@ -1,47 +1,103 @@
-Feature: Mask the last 4 digits of invoice numbers in the d_product_revenue_clone table
+
+  This feature ensures the last 4 digits of the invoice_number column in the d_product_revenue_clone table (replica of d_product_revenue) are masked using ‘*’, meeting compliance requirements for customer information protection.
 
   Background:
-    Given the d_product_revenue table exists
-    And the d_product_revenue_clone table may or may not exist
+    Given Unity Catalog is "purgo_databricks"
+    And Unity Catalog Schema is "purgo_playground"
+    And source table is "purgo_databricks.purgo_playground.d_product_revenue"
+    And destination table is "purgo_databricks.purgo_playground.d_product_revenue_clone"
+    And user has write permissions on both tables
+    And environment is Databricks with PySpark version compatible with masking logic
+    And the d_product_revenue table has a column invoice_number with String or Numeric data type
 
-  Scenario: Setup clone table
-    Given the d_product_revenue_clone table exists
-    When the table is dropped
-    Then a new d_product_revenue_clone table should replicate the d_product_revenue table structure
+  Scenario: Drop and create clone of d_product_revenue table
+    Given the table d_product_revenue_clone exists
+    When the table d_product_revenue_clone is dropped
+    Then no table named d_product_revenue_clone should exist in schema purgo_playground
+    When a clone of d_product_revenue is created as d_product_revenue_clone
+    Then d_product_revenue_clone should exist with identical schema as d_product_revenue
 
-  Scenario Outline: Mask last 4 digits of invoice_number
-    Given the d_product_revenue_clone table has invoice_number column with format <Invoice_Format>
-    When I mask the last 4 digits of invoice numbers
-    Then the invoice_number should be updated to <Masked_Invoice_Number>
+  Scenario Outline: Mask last 4 digits of invoice_number with ‘*’
+    Given d_product_revenue_clone contains the following invoice_number values:
+      | invoice_number |
+      | <original_invoice_number> |
+    When the masking process is executed on invoice_number column
+    Then the stored invoice_number should be "<masked_invoice_number>"
 
-  Examples:
-    | Invoice_Format | Masked_Invoice_Number |
-    | 1234234534     | 123423****            |
-    | A234R98234     | A234R9****            |
-    | 9876543210     | 987654****            |
+    Examples:
+      | original_invoice_number | masked_invoice_number |
+      | 1234234534             | 123423****           |
+      | 987654321098           | 98765432****         |
+      | AB12345678             | AB1234****           |
+      | 8765                   | ****                 |
+      | 543                    | ***                  |
+      | XY12                   | ****                 |
+      | 1                      | *                    |
+      | 000012340000           | 00001234****         |
+      | 12AB34XY56             | 12AB34XY**           |
 
-  Scenario: Handle non-standard invoice_number formats
-    Given a non-standard invoice_number format in the d_product_revenue_clone table
-    When an attempt is made to mask the last 4 digits
-    Then an error "Invalid format for invoice_number" should be logged
+  Scenario Outline: Error handling for null or invalid invoice_number values
+    Given d_product_revenue_clone contains the following invoice_number:
+      | invoice_number |
+      | <invalid_invoice_number> |
+    When the masking process is executed on invoice_number column
+    Then the following error condition should be triggered with message "<error_message>"
 
-  Scenario Outline: Error scenario for missing permissions
-    Given access is restricted for modifying the d_product_revenue_clone table
-    When I attempt to update the invoice_number column
-    Then the error "Insufficient permissions to modify table" should be raised
+    Examples:
+      | invalid_invoice_number | error_message                               |
+      | NULL                  | "invoice_number is NULL: cannot mask value" |
+      |                      | "invoice_number is empty: cannot mask value" |
+      | @#$%^&*()            | "invoice_number contains only special characters: masking all as *"|
 
-  Examples:
-    | Description            |
-    | Insufficient Data Owner permissions |
-    | Read-only access mode  |
+  Scenario Outline: Validation rules for masking invoice_number
+    Given an invoice_number value <test_value>
+    When the masking logic is applied
+    Then the result should satisfy the following rules:
+      | rule_description                                   |
+      | If length >= 4, mask last 4 chars as '*'           |
+      | If length < 4, mask all chars as '*'               |
+      | If value contains alphanumeric or numeric, mask chars only, preserve format |
+      | If value is NULL or empty, do not mask, set to error or log error    |
 
-  Scenario: Check compatibility with PySpark version
-    Given the PySpark version in use is <Version>
-    When code execution starts
-    Then it should be compatible without version-specific errors
+    Examples:
+      | test_value          |
+      | 123456789          |
+      | AB1234CD           |
+      | 123                |
+      |                    |
+      | NULL               |
+      | A                  |
+      | 1234               |
+      | ABCD               |
 
-  Examples:
-    | Version  |
-    | 3.0.1    |
-    | 3.1.2    |
-    | 3.2.0    |
+  Scenario: Ensure masked invoice_number format is preserved and no data loss
+    Given d_product_revenue_clone table has invoice_number values before masking
+    When the masking logic is run
+    Then all other columns should remain unchanged
+    And only the last 4 characters of invoice_number are replaced with '*'
+    And all invoice_number field lengths remain unchanged
+
+  Scenario: Logging and auditing of masking process
+    Given the masking process is initiated
+    When a value is masked or an error occurs
+    Then an entry is added to the audit log with timestamp, original value, masked value (if masked), and error message (if error occurs)
+
+  Scenario: Masking should be idempotent
+    Given an invoice_number value already masked (last 4 are '*')
+    When the masking logic runs again
+    Then the invoice_number remains unchanged
+    And no additional masking is applied
+
+  Scenario Outline: Masking on edge case inputs
+    Given the following invoice_number test case: <edge_case_value>
+    When the masking process is executed
+    Then the resulting invoice_number is <edge_case_result>
+    And any relevant error/warning is <edge_case_error>
+
+    Examples:
+      | edge_case_value | edge_case_result | edge_case_error                            |
+      | 12              | **               |                                            |
+      |                 |                  | "invoice_number is empty: cannot mask value"|
+      | NULL            |                  | "invoice_number is NULL: cannot mask value" |
+      | ****            | ****             |                                            |
+      |   1234          |   ****           |                                            |
